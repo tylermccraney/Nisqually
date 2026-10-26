@@ -7,24 +7,291 @@ output: github_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## GitHub Documents
+```{r}
+library(readxl)
+library(tidyverse)
+library(sequoia)
+library(ASRgenomics)
 
-This is an R Markdown format used for publishing markdown documents to GitHub. When you click the **Knit** button all R code chunks are run and a markdown file (.md) suitable for publishing to GitHub is generated.
+setwd("~/Google Drive/My Drive/Nisqually/Nisqually/")
 
-## Including Code
+# get vector of sheet names
+excel_sheets("../data-from-Adrian/Nisqually Chinook genotypes.xlsx")
 
-You can include R code in the document as follows:
+# import data
+dat <- 
+  bind_rows(
+    read_excel("../data-from-Adrian/Nisqually Chinook genotypes.xlsx", sheet="smolt trap sample genotypes", skip=1, col_types="text"), 
+    read_excel("../data-from-Adrian/Nisqually Chinook genotypes.xlsx", sheet="95 random controls", skip=1, col_types="text")) |> 
+  select(-random)
 
-```{r cars}
-summary(cars)
+# cleanup column names
+names(dat) <- 
+  names(dat) |> 
+  gsub(pattern="-", replacement="_") |> 
+  gsub(pattern=" ", replacement="_") |> 
+  gsub(pattern="'", replacement="_") |> 
+  gsub(pattern=".", replacement="_", fixed=TRUE) |> 
+  gsub(pattern="%", replacement="percent", fixed=TRUE)
+
+print(dat)
+
+table(dat$Life_history, useNA="ifany")
+
+dat2 <-
+  read_csv("../data-from-Adrian/newhybrids_assignments.csv")
+
+print(dat2)
+
+table(dat2$newhybrids)
+
+lh <- 
+  select(dat, Life_history, ID=USE_sample_name, Sex=Sex_ID, BirthYear=USE_sample_name) |>
+  mutate(BirthYear=str_extract(BirthYear, "^\\d{2}") |> as.integer())
+
+table(lh$BirthYear, lh$Life_history, useNA="ifany")
+
+lh$BirthYear[1:9008] <- 
+  lh$BirthYear[1:9008] + 1999
+
+lh$BirthYear[9009:9103] <- 
+  NA
+
+lh <- 
+  mutate(lh, BY.min=NA, BY.max=NA)
+
+table(lh$BirthYear, lh$Sex, useNA="ifany")
+
+lh$BY.min[9009:9103] <- 
+  str_extract(string=lh$ID[9009:9103], pattern="^\\d{2}") |> as.numeric() + 2000 - 6
+
+lh$BY.max[9009:9103] <- 
+  str_extract(string=lh$ID[9009:9103], pattern="^\\d{2}") |> as.numeric() + 2000 - 2
+
+
+lh$Sex <- 
+  gsub(pattern="F", replacement=1, lh$Sex) |>
+  gsub(pattern="M", replacement=2) |>
+  gsub(pattern="no data", replacement=NA) |>
+  as.integer()
+
+lh$BirthYear <- 
+  as.integer(lh$BirthYear)
+
+lh$BY.min <- 
+  as.integer(lh$BY.min)
+
+lh$BY.max <- 
+  as.integer(lh$BY.max)
+
+tail(lh)
+
+lh$ID[1:9008] <- 
+  paste0("s", lh$ID[1:9008])
+
+lh$ID[9009:9103] <- 
+  paste0("a", lh$ID[9009:9103])
+
+gt <- 
+  select(dat, ID=USE_sample_name, 22:319)
+
+gt$ID[1:9008] <- 
+  paste0("s", gt$ID[1:9008])
+
+gt$ID[9009:9103] <- 
+  paste0("a", gt$ID[9009:9103])
+
+# filter exact duplicates
+dups <-
+  column_to_rownames(gt, "ID")[duplicated(column_to_rownames(gt, "ID")), ] |>
+  rownames_to_column("ID") |>
+  as_tibble() |>
+  select(ID)
+
+print(dups)
+
+gt <-
+  filter(gt, !ID %in% dups$ID)
+
+lh <-
+  filter(lh, !ID %in% dups$ID)
+
+# recode INDELs as SNPs
+indels <- 
+  gt %>% select(where(~any(grepl("-", .x, fixed=TRUE))))
+
+gt$Ots_128757_61R <- 
+  gsub(pattern="-", replacement="G", x=gt$Ots_128757_61R)
+
+gt$Ots_GDH_81x <- 
+  gsub(pattern="-", replacement="T", x=gt$Ots_GDH_81x)
+
+gt$Ots_Ots311_101x <- 
+  gsub(pattern="-", replacement="G", x=gt$Ots_Ots311_101x)
+
+gt$Ots_RFC2_558 <- 
+  gsub(pattern="-", replacement="G", x=gt$Ots_RFC2_558)
+
+gt$Ots_U2305_63 <- 
+  gsub(pattern="-", replacement="C", x=gt$Ots_U2305_63)
+
+gt$Ots_pigh_105 <- 
+  gsub(pattern="-", replacement="G", x=gt$Ots_pigh_105)
+
+gt$Ots_u07_17_373 <- 
+  gsub(pattern="-", replacement="G", x=gt$Ots_u07_17_373)
+
+gt$Ots_vatf_251 <- 
+  gsub(pattern="-", replacement="A", x=gt$Ots_vatf_251)
+
+gt <-
+  gt |>
+  rowwise() |>
+  mutate(perc=sum(is.na(c_across(2:299)))/298) |> 
+  ungroup()
+
+
+# filter individuals with at least 75% calls
+gt <- 
+  filter(gt, perc<=0.25)
+
+lh <- 
+  filter(lh[-1], ID %in% pull(gt, ID))
+
+# recode SNPs as 012
+gm <- 
+  snp.recode(
+    M=as.matrix(column_to_rownames(gt[-300], var="ID")), 
+    recoding="ATGCto012")
+
+snpstats <- SnpStats(gm$Mrecode)
+
+# filter SNPs with ≥ 75% calls, HWE.p ≥ 0.05/n, and Minor Allele Frequency ≥ 5%
+p75af95 <-
+  filter(as.data.frame(snpstats) |> rownames_to_column("ID"), Mis<=0.05) |> 
+  as_tibble() %>%
+  filter(HWE.p>=0.05/nrow(.)) |>
+  filter(AF<=0.95)
+
+p75af95 %>% 
+  print(n=nrow(.))
+
+gm75 <- 
+  snp.recode(
+    M=as.matrix(column_to_rownames(select(gt[-300], c("ID", str_remove(string=p75af95$ID, pattern="[A-Z_0]{4}$"))), var="ID")), 
+    recoding="ATGCto012")
+
+gm75 <- 
+  CheckGeno(gm75$Mrecode)
+
+# check for duplicates
+dup1 <- 
+  sequoia(
+    GenoM=gm75, 
+    LifeHistData=as.data.frame(lh), 
+    Module="dup", 
+    quiet="verbose", 
+    Plot=FALSE)
+
+# filter duplicates with most calls
+dup1cut <- 
+  bind_cols(
+    filter(gt, ID %in% dup1$DupGenotype$ID1) |> select(ID1=ID, perc1=perc), 
+    filter(gt, ID %in% dup1$DupGenotype$ID2) |> select(ID2=ID, perc2=perc)) %>% 
+  mutate(ID=if_else(condition=perc1<=perc2, true=ID2, false=ID1))
+
+print(dup1cut)
+
+gm75c <- 
+  snp.recode(
+    M=as.matrix(column_to_rownames(select(gt[-300], c("ID", str_remove(string=p75af95$ID, pattern="[A-Z_0]{4}$"))) |> filter(!ID %in% pull(dup1cut, ID)), var="ID")), 
+    recoding="ATGCto012")
+
+lhc <- 
+  filter(lh, ID %in% rownames(gm75c$Mrecode))
+
+gm75c <- 
+  CheckGeno(gm75c$Mrecode)
+
+dim(gm75c)
+
+dim(lhc)
+
+# check for duplicates again
+dup2 <- 
+  sequoia(
+    GenoM=gm75c, 
+    LifeHistData=as.data.frame(lhc), 
+    Module="dup",
+    quiet="verbose", 
+    Plot=FALSE)
+
+dup2cut <- 
+  bind_cols(
+    filter(gt, ID %in% dup2$DupGenotype$ID1) |> select(ID1=ID, perc1=perc), 
+    filter(gt, ID %in% dup2$DupGenotype$ID2) |> select(ID2=ID, perc2=perc)) %>% 
+  mutate(ID=if_else(condition=perc1<=perc2, true=ID2, false=ID1))
+
+# estimate parentage
+par1 <- 
+  sequoia(
+    GenoM=gm75c[rownames(gm75c)[!rownames(gm75c) %in% dup2cut$ID], ], 
+    LifeHistData=as.data.frame(lhc) |> filter(!ID %in% dup2cut$ID), 
+    Module="par",
+    quiet="verbose", 
+    Plot=FALSE)
+
+filter(par1$PedigreePar, !is.na(dam) | !is.na(sire)) |> 
+  as_tibble() |> 
+  select(-LLRdam, -LLRsire, -LLRpair) %>% 
+  print(n=nrow(.))
+
+tibble(
+  x=c(table(par1$PedigreePar$dam), table(par1$PedigreePar$sire)), 
+  sex=c(rep("female", table(par1$PedigreePar$dam) |> length()), rep("male", table(par1$PedigreePar$sire) |> length()))) |> 
+  ggplot(aes(x=x, fill=sex)) + 
+  geom_histogram(position="dodge") + 
+  labs(x="number of offspring", title="Males exhibit higher variance in reproductive success")
+
+
+female <- 
+  c(mean=table(par1$PedigreePar$dam) |> mean(), 
+    sd=table(par1$PedigreePar$dam) |> sd())
+
+male <- 
+  c(mean=table(par1$PedigreePar$sire) |> mean(), 
+    sd=table(par1$PedigreePar$sire) |> sd())
+
+round(female, 2)
+round(male, 2)
+
+assignments <-
+  dat2 |> 
+  mutate(ID=paste0("s", sample_name)) |> 
+  select(3, 2)
+
+par1par <- 
+  filter(par1$PedigreePar, !is.na(dam) | !is.na(sire)) |>
+  left_join(y=assignments, by=join_by(id==ID)) |> 
+  rename(offspring=newhybrids) |> 
+  left_join(y=assignments, by=join_by(dam==ID)) |> 
+  rename(maternal=newhybrids) |> 
+  left_join(y=assignments, by=join_by(sire==ID)) |> 
+  rename(paternal=newhybrids) |> 
+  as_tibble() |> 
+  select(-LLRdam, -LLRsire, -LLRpair) 
+
+par1par %>% 
+  print(n=nrow(.))
+
+table(par1par$offspring, useNA="ifany")
+
+table(par1par$maternal, useNA="ifany")
+
+table(par1par$paternal, useNA="ifany")
+
+table(par1par$offspring, par1par$maternal)
+
+table(par1par$offspring, par1par$paternal)
+
 ```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

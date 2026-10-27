@@ -256,19 +256,21 @@ tibble(
 
 female <- 
   c(mean=table(par1$PedigreePar$dam) |> mean(), 
-    sd=table(par1$PedigreePar$dam) |> sd())
+    variance=table(par1$PedigreePar$dam) |> var())
 
 male <- 
   c(mean=table(par1$PedigreePar$sire) |> mean(), 
-    sd=table(par1$PedigreePar$sire) |> sd())
+    variance=table(par1$PedigreePar$sire) |> var())
 
-round(female, 2)
-round(male, 2)
+round(female, 1)
+
+round(male, 1)
 
 assignments <-
   dat2 |> 
   mutate(ID=paste0("s", sample_name)) |> 
-  select(3, 2)
+  select(3, 2) |>
+  bind_rows(filter(lhc[1], grepl(pattern="^a", ID)) |> mutate(newhybrids="ClearCreek"))
 
 par1par <- 
   filter(par1$PedigreePar, !is.na(dam) | !is.na(sire)) |>
@@ -284,14 +286,40 @@ par1par <-
 par1par %>% 
   print(n=nrow(.))
 
-table(par1par$offspring, useNA="ifany")
+table(par1par$offspring)
 
-table(par1par$maternal, useNA="ifany")
+table(par1par$maternal)
 
-table(par1par$paternal, useNA="ifany")
+table(par1par$paternal)
 
 table(par1par$offspring, par1par$maternal)
 
 table(par1par$offspring, par1par$paternal)
+
+par1par <- 
+  left_join(x=par1par, y=lhc[c(1, 3)], by=join_by(id==ID)) |> 
+  rename(BYid=BirthYear) |> 
+  left_join(y=lhc[c(1, 3)], by=join_by(dam==ID)) |> 
+  rename(BYdam=BirthYear) |> 
+  left_join(y=lhc[c(1, 3)], by=join_by(sire==ID)) |> 
+  rename(BYsire=BirthYear)
+
+par1par %>% 
+  print(n=nrow(.))
+
+par1par <- 
+  mutate(par1par, BYid_BYdam=BYid-BYdam, BYid_BYsire=BYid-BYsire)
+
+table(par1par$BYid_BYdam)
+
+table(par1par$BYid_BYsire)
+
+filter(
+  par1par, 
+  grepl(pattern="^a", id) | 
+    grepl(pattern="^a", dam) | 
+    grepl(pattern="^a", sire)) |> 
+  select(-MEpair, -BYdam, -BYid_BYdam, -BYid_BYsire) %>% 
+  print(n=nrow(.))
 
 ```

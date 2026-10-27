@@ -14,18 +14,37 @@ library(sequoia)
 library(ASRgenomics)
 
 setwd("~/Google Drive/My Drive/Nisqually/Nisqually/")
+```
 
-# get vector of sheet names
+### get vector of sheet names
+
+```{r}
 excel_sheets("../data-from-Adrian/Nisqually Chinook genotypes.xlsx")
 
-# import data
+```
+
+### import data
+
+```{r}
 dat <- 
   bind_rows(
-    read_excel("../data-from-Adrian/Nisqually Chinook genotypes.xlsx", sheet="smolt trap sample genotypes", skip=1, col_types="text"), 
-    read_excel("../data-from-Adrian/Nisqually Chinook genotypes.xlsx", sheet="95 random controls", skip=1, col_types="text")) |> 
+    read_excel(
+      path="../data-from-Adrian/Nisqually Chinook genotypes.xlsx", 
+      sheet="smolt trap sample genotypes", 
+      skip=1, 
+      col_types="text"), 
+    read_excel(
+      path="../data-from-Adrian/Nisqually Chinook genotypes.xlsx", 
+      sheet="95 random controls", 
+      skip=1, 
+      col_types="text")) |> 
   select(-random)
 
-# cleanup column names
+```
+
+### cleanup column names
+
+```{r}
 names(dat) <- 
   names(dat) |> 
   gsub(pattern="-", replacement="_") |> 
@@ -49,10 +68,9 @@ lh <-
   select(dat, Life_history, ID=USE_sample_name, Sex=Sex_ID, BirthYear=USE_sample_name) |>
   mutate(BirthYear=str_extract(BirthYear, "^\\d{2}") |> as.integer())
 
-table(lh$BirthYear, lh$Life_history, useNA="ifany")
-
 lh$BirthYear[1:9008] <- 
-  lh$BirthYear[1:9008] + 1999
+  lh$BirthYear[1:9008] + 
+  1999
 
 lh$BirthYear[9009:9103] <- 
   NA
@@ -63,10 +81,16 @@ lh <-
 table(lh$BirthYear, lh$Sex, useNA="ifany")
 
 lh$BY.min[9009:9103] <- 
-  str_extract(string=lh$ID[9009:9103], pattern="^\\d{2}") |> as.numeric() + 2000 - 6
+  str_extract(string=lh$ID[9009:9103], pattern="^\\d{2}") |> 
+  as.numeric() + 
+  2000 - 
+  6
 
 lh$BY.max[9009:9103] <- 
-  str_extract(string=lh$ID[9009:9103], pattern="^\\d{2}") |> as.numeric() + 2000 - 2
+  str_extract(string=lh$ID[9009:9103], pattern="^\\d{2}") |> 
+  as.numeric() + 
+  2000 - 
+  2
 
 
 lh$Sex <- 
@@ -86,22 +110,39 @@ lh$BY.max <-
 
 tail(lh)
 
+mutate(dat, IFI=as.double(IFI)) |> 
+  ggplot(aes(x=IFI)) + 
+  geom_histogram() + 
+  geom_vline(xintercept=2.5, linetype="dashed", colour="red")
+
+```
+
+```{r}
+gt <- 
+  mutate(dat, IFI=as.double(IFI)) |>
+  filter(IFI<=2.5) |>
+  select(ID=USE_sample_name, 22:319)
+
+gt$ID[1:8870] <- 
+  paste0("s", gt$ID[1:8870])
+
+gt$ID[8871:8965] <- 
+  paste0("a", gt$ID[8871:8965])
+
 lh$ID[1:9008] <- 
   paste0("s", lh$ID[1:9008])
 
 lh$ID[9009:9103] <- 
   paste0("a", lh$ID[9009:9103])
 
-gt <- 
-  select(dat, ID=USE_sample_name, 22:319)
+lh <-
+  filter(lh, ID %in% gt$ID)
 
-gt$ID[1:9008] <- 
-  paste0("s", gt$ID[1:9008])
+table(lh$BY.min, lh$BY.max)
+```
 
-gt$ID[9009:9103] <- 
-  paste0("a", gt$ID[9009:9103])
-
-# filter exact duplicates
+```{r}
+### filter exact duplicates
 dups <-
   column_to_rownames(gt, "ID")[duplicated(column_to_rownames(gt, "ID")), ] |>
   rownames_to_column("ID") |>
@@ -116,9 +157,10 @@ gt <-
 lh <-
   filter(lh, !ID %in% dups$ID)
 
-# recode INDELs as SNPs
-indels <- 
-  gt %>% select(where(~any(grepl("-", .x, fixed=TRUE))))
+### recode INDELs as SNPs
+gt %>% 
+  select(where(~any(grepl("-", .x, fixed=TRUE)))) %>% 
+  glimpse()
 
 gt$Ots_128757_61R <- 
   gsub(pattern="-", replacement="G", x=gt$Ots_128757_61R)
@@ -144,56 +186,107 @@ gt$Ots_u07_17_373 <-
 gt$Ots_vatf_251 <- 
   gsub(pattern="-", replacement="A", x=gt$Ots_vatf_251)
 
+```
+
+
+```{r}
 gt <-
   gt |>
   rowwise() |>
   mutate(perc=sum(is.na(c_across(2:299)))/298) |> 
   ungroup()
 
+ggplot(data=gt, mapping=aes(x=perc)) + 
+  geom_histogram() + 
+  geom_vline(xintercept=0.3, linetype="dashed", colour="red") +
+  labs(x="proportion of missing SNPs")
 
-# filter individuals with at least 75% calls
+```
+
+### filter individuals with ≥ 30% missing SNPs
+
+```{r}
 gt <- 
-  filter(gt, perc<=0.25)
+  filter(gt, perc<=0.3)
 
 lh <- 
   filter(lh[-1], ID %in% pull(gt, ID))
 
-# recode SNPs as 012
+### recode SNPs as 012
 gm <- 
   snp.recode(
     M=as.matrix(column_to_rownames(gt[-300], var="ID")), 
     recoding="ATGCto012")
 
-snpstats <- SnpStats(gm$Mrecode)
+### remove individuals if heterozygous genotypes were called at fewer than 10% of genotyped loci
+hets <- 
+  rowSums(gm$Mrecode==1, na.rm=TRUE) / 
+  (rowSums(gm$Mrecode==0, na.rm=TRUE) + rowSums(gm$Mrecode==2, na.rm=TRUE))
 
-# filter SNPs with ≥ 75% calls, HWE.p ≥ 0.05/n, and Minor Allele Frequency ≥ 5%
-p75af95 <-
-  filter(as.data.frame(snpstats) |> rownames_to_column("ID"), Mis<=0.05) |> 
-  as_tibble() %>%
+min(hets) ### OK
+
+snpstats <- 
+  SnpStats(gm$Mrecode, Plot=FALSE)
+
+as.data.frame(snpstats) |> 
+  rownames_to_column("ID") |> 
+  ggplot(mapping=aes(x=Mis)) + 
+  geom_histogram() + 
+  geom_vline(xintercept=0.1, linetype="dashed", colour="red") +
+  labs(x="proportion of missing genotypes")
+```
+
+### filter SNPs with ≥ 90% calls, HWE.p ≥ 0.05/n, and Minor Allele Frequency ≥ 5%
+
+```{r}
+as.data.frame(snpstats) |> 
+  rownames_to_column("ID") |> 
+  ggplot(mapping=aes(x=HWE.p)) + 
+  geom_histogram() + 
+  scale_x_log10() +
+  geom_vline(xintercept=0.05/298, linetype="dashed", colour="red") +
+  labs(x="HWE p-value")
+```
+
+### filter SNPs with ≥ 90% calls, HWE.p ≥ 0.05/n, and Minor Allele Frequency ≥ 5%
+
+```{r}
+
+p90af95 <-
+  as.data.frame(snpstats) |> rownames_to_column("ID") %>%
   filter(HWE.p>=0.05/nrow(.)) |>
-  filter(AF<=0.95)
+  filter(Mis<=0.1, AF<=0.95) |> 
+  as_tibble()
 
-p75af95 %>% 
+p90af95 %>% 
   print(n=nrow(.))
 
+```
+
+
+```{r}
 gm75 <- 
   snp.recode(
-    M=as.matrix(column_to_rownames(select(gt[-300], c("ID", str_remove(string=p75af95$ID, pattern="[A-Z_0]{4}$"))), var="ID")), 
+    M=as.matrix(
+      column_to_rownames(
+        select(gt[-300], c("ID", str_remove(string=p90af95$ID, pattern="[A-Z_0]{4}$"))), 
+        var="ID")), 
     recoding="ATGCto012")
 
 gm75 <- 
   CheckGeno(gm75$Mrecode)
 
-# check for duplicates
+### check for duplicates
 dup1 <- 
   sequoia(
     GenoM=gm75, 
     LifeHistData=as.data.frame(lh), 
     Module="dup", 
     quiet="verbose", 
+    args.AP=list(MinAgeParent=2),
     Plot=FALSE)
 
-# filter duplicates with most calls
+### filter duplicates with most calls
 dup1cut <- 
   bind_cols(
     filter(gt, ID %in% dup1$DupGenotype$ID1) |> select(ID1=ID, perc1=perc), 
@@ -204,7 +297,12 @@ print(dup1cut)
 
 gm75c <- 
   snp.recode(
-    M=as.matrix(column_to_rownames(select(gt[-300], c("ID", str_remove(string=p75af95$ID, pattern="[A-Z_0]{4}$"))) |> filter(!ID %in% pull(dup1cut, ID)), var="ID")), 
+    M=as.matrix(
+      column_to_rownames(
+        select(
+          gt[-300], 
+          c("ID", str_remove(string=p90af95$ID, pattern="[A-Z_0]{4}$"))) |> filter(!ID %in% pull(dup1cut, ID)), 
+        var="ID")), 
     recoding="ATGCto012")
 
 lhc <- 
@@ -217,13 +315,14 @@ dim(gm75c)
 
 dim(lhc)
 
-# check for duplicates again
+### check for duplicates again
 dup2 <- 
   sequoia(
     GenoM=gm75c, 
     LifeHistData=as.data.frame(lhc), 
     Module="dup",
     quiet="verbose", 
+    args.AP=list(MinAgeParent=2),
     Plot=FALSE)
 
 dup2cut <- 
@@ -232,13 +331,14 @@ dup2cut <-
     filter(gt, ID %in% dup2$DupGenotype$ID2) |> select(ID2=ID, perc2=perc)) %>% 
   mutate(ID=if_else(condition=perc1<=perc2, true=ID2, false=ID1))
 
-# estimate parentage
+### estimate parentage
 par1 <- 
   sequoia(
     GenoM=gm75c[rownames(gm75c)[!rownames(gm75c) %in% dup2cut$ID], ], 
     LifeHistData=as.data.frame(lhc) |> filter(!ID %in% dup2cut$ID), 
     Module="par",
     quiet="verbose", 
+    args.AP=list(MinAgeParent=2, MaxAgeParent=6),
     Plot=FALSE)
 
 filter(par1$PedigreePar, !is.na(dam) | !is.na(sire)) |> 
@@ -288,14 +388,6 @@ par1par %>%
 
 table(par1par$offspring)
 
-table(par1par$maternal)
-
-table(par1par$paternal)
-
-table(par1par$offspring, par1par$maternal)
-
-table(par1par$offspring, par1par$paternal)
-
 par1par <- 
   left_join(x=par1par, y=lhc[c(1, 3)], by=join_by(id==ID)) |> 
   rename(BYid=BirthYear) |> 
@@ -306,6 +398,14 @@ par1par <-
 
 par1par %>% 
   print(n=nrow(.))
+
+table(par1par$maternal)
+
+table(par1par$paternal)
+
+table(par1par$offspring, par1par$maternal)
+
+table(par1par$offspring, par1par$paternal)
 
 par1par <- 
   mutate(par1par, BYid_BYdam=BYid-BYdam, BYid_BYsire=BYid-BYsire)

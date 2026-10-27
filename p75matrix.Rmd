@@ -1,11 +1,13 @@
 ---
-title: "p75matrix"
+title: "Exploratory data filtering and parentage analysis of 95 adult and 9,008 juvenile Nisqually River Chinook salmon"
 output: github_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
+Load package libraries and set working directory.
 
 ```{r}
 library(readxl)
@@ -16,14 +18,13 @@ library(ASRgenomics)
 setwd("~/Google Drive/My Drive/Nisqually/Nisqually/")
 ```
 
-### get vector of sheet names
+Adrian provided an MS Excel workbook containing genotypes and other information. To import the genotypes, we first need to get the names of the worksheets, as follows:
 
 ```{r}
 excel_sheets("../data-from-Adrian/Nisqually Chinook genotypes.xlsx")
-
 ```
 
-### import data
+Now we can import genotype data from 2 worksheets and join them together.
 
 ```{r}
 dat <- 
@@ -39,10 +40,9 @@ dat <-
       skip=1, 
       col_types="text")) |> 
   select(-random)
-
 ```
 
-### cleanup column names
+The column names include problematic characters such as whitespaces, dashes, periods, etc. Lets cleanup the column names by replacing all of those problematic characters with an underscore.
 
 ```{r}
 names(dat) <- 
@@ -53,17 +53,25 @@ names(dat) <-
   gsub(pattern=".", replacement="_", fixed=TRUE) |> 
   gsub(pattern="%", replacement="percent", fixed=TRUE)
 
-print(dat)
+```
 
-table(dat$Life_history, useNA="ifany")
+Now lets import NEWHYBRIDS assignments that were provided by Adrian. These include assignments for the juveniles only (all 95 adults are Clear Creek HORs).  
 
+```{r}
 dat2 <-
   read_csv("../data-from-Adrian/newhybrids_assignments.csv")
 
-print(dat2)
+glimpse(dat2)
+```
 
+Lets tabulate the juvenile NEWHYBRIDS assignments.    
+
+```{r}
 table(dat2$newhybrids)
+```
+Lets construct a Life History (LH) table for the parentage analysis. For juveniles, we set the `BirthYear` to the year before sample collection, which is encoded as the first 2-digits of the DFW sample names. For example, `BirthYear` of sample `13QW0001_02` would be `2012`. This assumes no yearling LH.    
 
+```{r}
 lh <- 
   select(dat, Life_history, ID=USE_sample_name, Sex=Sex_ID, BirthYear=USE_sample_name) |>
   mutate(BirthYear=str_extract(BirthYear, "^\\d{2}") |> as.integer())
@@ -74,10 +82,13 @@ lh$BirthYear[1:9008] <-
 lh$BirthYear[9009:9103] <- 
   NA
 
+```
+
+For adults, we set the `BY.min` and `BY.max` to 6 and 2 years before the sample collection year, respectively. For instance, `BY.min` and `BY.max` of sample `18QN2832` would be `2012` and `2016`, respectively.    
+
+```{r}
 lh <- 
   mutate(lh, BY.min=NA, BY.max=NA)
-
-table(lh$BirthYear, lh$Sex, useNA="ifany")
 
 lh$BY.min[9009:9103] <- 
   str_extract(string=lh$ID[9009:9103], pattern="^\\d{2}") |> 
@@ -87,7 +98,11 @@ lh$BY.max[9009:9103] <-
   str_extract(string=lh$ID[9009:9103], pattern="^\\d{2}") |> 
   as.numeric() + 2000 - 2
 
+```
 
+Recode F,M as 1,2.
+
+```{r}
 lh$Sex <- 
   gsub(pattern="F", replacement=1, lh$Sex) |>
   gsub(pattern="M", replacement=2) |>
@@ -105,6 +120,10 @@ lh$BY.max <-
 
 tail(lh)
 
+```
+DFW filters individuals with IFI scores greater than 2.5. Lets see what that looks like.
+
+```{r}
 mutate(dat, IFI=as.double(IFI)) |> 
   ggplot(aes(x=IFI)) + 
   geom_histogram() + 
@@ -112,12 +131,19 @@ mutate(dat, IFI=as.double(IFI)) |>
 
 ```
 
+Lets go ahead and filter individuals with IFI scores greater than 2.5.
+
 ```{r}
 gt <- 
   mutate(dat, IFI=as.double(IFI)) |>
   filter(IFI<=2.5) |>
   select(ID=USE_sample_name, 22:319)
 
+```
+
+Here we are prepending sample names with "s" or "a" to indicate smolt or adult, and wrangling LH data.  
+
+```{r}
 gt$ID[1:8870] <- 
   paste0("s", gt$ID[1:8870])
 
@@ -132,27 +158,26 @@ lh$ID[9009:9103] <-
 
 lh <-
   filter(lh, ID %in% gt$ID)
-
-table(lh$BY.min, lh$BY.max)
 ```
+Now we will filter exact duplicates.  
 
 ```{r}
-### filter exact duplicates
 dups <-
   column_to_rownames(gt, "ID")[duplicated(column_to_rownames(gt, "ID")), ] |>
   rownames_to_column("ID") |>
   as_tibble() |>
   select(ID)
 
-print(dups)
-
 gt <-
   filter(gt, !ID %in% dups$ID)
 
 lh <-
   filter(lh, !ID %in% dups$ID)
+```
 
-### recode INDELs as SNPs
+For parentage analysis with `sequoia()`, we need to recode INDELs as SNPs.  
+
+```{r}
 gt %>% 
   select(where(~any(grepl("-", .x, fixed=TRUE)))) %>% 
   glimpse()
@@ -180,9 +205,9 @@ gt$Ots_u07_17_373 <-
 
 gt$Ots_vatf_251 <- 
   gsub(pattern="-", replacement="A", x=gt$Ots_vatf_251)
-
 ```
 
+Now lets tabulate the proportion of missing genotypes per individual.  
 
 ```{r}
 gt <-
@@ -190,15 +215,19 @@ gt <-
   rowwise() |>
   mutate(perc=sum(is.na(c_across(2:299)))/298) |> 
   ungroup()
+```
 
+DFW filters individuals with less than 30% missing genotypes. Lets see what that looks like.  
+
+```{r}
 ggplot(data=gt, mapping=aes(x=perc)) + 
   geom_histogram() + 
   geom_vline(xintercept=0.3, linetype="dashed", colour="red") +
-  labs(x="proportion of missing SNPs")
+  labs(x="proportion of missing genotypes per individual")
 
 ```
 
-### filter individuals with ≤ 30% missing SNPs
+We'll go ahead and filter individuals with ≤ 30% missing.  
 
 ```{r}
 gt <- 
@@ -206,20 +235,29 @@ gt <-
 
 lh <- 
   filter(lh[-1], ID %in% pull(gt, ID))
+```
 
-### recode SNPs as 012
+DFW removes individuals with heterozygous genotypes called at less than 10% of genotyped loci. Lets see if any individuals meet this criteria.
+
+```{r}
+# recode SNPs (e.g., AA, AG, GG) as numeric matrix (i.e., 0, 1, 2)
 gm <- 
   snp.recode(
     M=as.matrix(column_to_rownames(gt[-300], var="ID")), 
     recoding="ATGCto012")
 
-### remove individuals if heterozygous genotypes were called at fewer than 10% of genotyped loci
 hets <- 
   rowSums(gm$Mrecode==1, na.rm=TRUE) / 
   (rowSums(gm$Mrecode==0, na.rm=TRUE) + rowSums(gm$Mrecode==2, na.rm=TRUE))
 
-round(min(hets)*100, 1) # No filtering needed
+round(min(hets)*100, 1) 
+```
 
+No heterozygosity filtering needed.  
+
+DFW filters SNPs with less than 10% missing genotypes. Lets see what that looks like.  
+
+```{r}
 snpstats <- 
   SnpStats(gm$Mrecode, Plot=FALSE)
 
@@ -228,34 +266,38 @@ as.data.frame(snpstats) |>
   ggplot(mapping=aes(x=Mis)) + 
   geom_histogram() + 
   geom_vline(xintercept=0.1, linetype="dashed", colour="red") +
-  labs(x="proportion of missing genotypes")
+  labs(x="proportion of missing genotypes per SNP")
 ```
 
-### filter SNPs with ≥ 90% calls, HWE.p ≥ 0.05/n, and Minor Allele Frequency ≥ 5%
+DFW doesn't do any filtering based on conformance to Hardy-Weinberg Equilibrium (HWE). I think severe violations of HWE are a good indication of high genotyping error. Let's consider filtering SNPs with Bonferroni-corrected HWE p-value ≥ 0.05/n (n is number of HWE tests).
 
 ```{r}
 as.data.frame(snpstats) |> 
   rownames_to_column("ID") |> 
   ggplot(mapping=aes(x=HWE.p)) + 
-  geom_histogram() + 
+  geom_histogram(bins=100) + 
   scale_x_log10() +
   geom_vline(xintercept=0.05/298, linetype="dashed", colour="red") +
   labs(x="HWE p-value")
 ```
 
-### filter SNPs with ≥ 90% calls, HWE.p ≥ 0.05/n, and Minor Allele Frequency ≥ 1%
+Lets filter SNPs with ≥ 90% genotypes and HWE.p ≥ 0.05/n. DFW doesn't filter SNPs based on Minor Allele Frequency (MAF), but I'm going to remove SNPs with MAF < 1%, because these SNPs are unlikely to be informative for parentage analysis. Ideally, we would filter SNPs with MAF ≥ 30%, so that Parent-Offspring (PO) pairs can be evaluated with Opposing Homozygosity (OH) at a sufficient number of SNPs.  
 
 ```{r}
 p90af99 <-
   as.data.frame(snpstats) |> rownames_to_column("ID") %>%
   filter(Mis<=0.1, HWE.p>=0.05/nrow(.), AF<=0.99) |>
   as_tibble()
-
-p90af99 %>% 
-  print(n=nrow(.))
-
 ```
 
+A total of 180 SNPs remain after filtering. Most of these SNPs will be uninformative for parentage analysis because they have low MAFs (only 64 SNPs with MAF ≥ 30%, which is recommended MAF filtering for parentage with `sequoia()`).
+
+```{r}
+p90af99 %>% 
+  print(n=nrow(.))
+```
+
+Now we're going to check for duplicates and filter the duplicate samples with more genotypes. We do this 2x to remove all potential duplicates.  
 
 ```{r}
 gm75 <- 
@@ -269,17 +311,15 @@ gm75 <-
 gm75 <- 
   CheckGeno(gm75$Mrecode)
 
-### check for duplicates
 dup1 <- 
   sequoia(
     GenoM=gm75, 
     LifeHistData=as.data.frame(lh), 
     Module="dup", 
     quiet="verbose", 
-    args.AP=list(MinAgeParent=2),
     Plot=FALSE)
 
-### filter duplicates with most calls
+# filter duplicates with most calls
 dup1cut <- 
   bind_cols(
     filter(gt, ID %in% dup1$DupGenotype$ID1) |> select(ID1=ID, perc1=perc), 
@@ -306,14 +346,13 @@ gm75c <-
 
 dim(lhc)
 
-### check for duplicates again
+# check for duplicates again
 dup2 <- 
   sequoia(
     GenoM=gm75c, 
     LifeHistData=as.data.frame(lhc), 
     Module="dup",
     quiet="verbose", 
-    args.AP=list(MinAgeParent=2),
     Plot=FALSE)
 
 dup2cut <- 
@@ -323,10 +362,9 @@ dup2cut <-
   mutate(ID=if_else(condition=perc1<=perc2, true=ID2, false=ID1))
 ```
 
-### estimate parentage
+Okay, now we're ready to infer parentage. We include min=2 and max=6 age constraints for parents (the default would be min=1 and max=9).
 
 ```{r}
-
 par1 <- 
   sequoia(
     GenoM=gm75c[rownames(gm75c)[!rownames(gm75c) %in% dup2cut$ID], ], 
@@ -335,20 +373,32 @@ par1 <-
     quiet="verbose", 
     args.AP=list(MinAgeParent=2, MaxAgeParent=6),
     Plot=FALSE)
+```
 
+Lets look at the parentage results. `OHdam`, `OHsire` show the Opposing Homozygosity (OH) counts for PO pairs, and `MEpair` is the number of Mendelian Errors (ME) for PO trios. OH and ME other than 0 arise from genotyping errors, so ideally these would all be zero. 
+
+```{r}
 filter(par1$PedigreePar, !is.na(dam) | !is.na(sire)) |> 
   as_tibble() |> 
   select(-LLRdam, -LLRsire, -LLRpair) %>% 
   print(n=nrow(.))
 
+```
+
+Now lets take a look at parentage through the lens of sexual selection, which predicts that males would exhibit higher variance in reproductive success than females.  
+
+```{r}
 tibble(
   x=c(table(par1$PedigreePar$dam), table(par1$PedigreePar$sire)), 
   sex=c(rep("female", table(par1$PedigreePar$dam) |> length()), rep("male", table(par1$PedigreePar$sire) |> length()))) |> 
   ggplot(aes(x=x, fill=sex)) + 
   geom_histogram(position="dodge") + 
-  labs(x="number of offspring", title="Males exhibit higher variance in reproductive success")
+  labs(x="number of offspring", title="Do males exhibit higher variance in reproductive success?")
+```
 
+Lets crunch the numbers and see...
 
+```{r}
 female <- 
   c(mean=table(par1$PedigreePar$dam) |> mean(), 
     variance=table(par1$PedigreePar$dam) |> var())
@@ -357,10 +407,14 @@ male <-
   c(mean=table(par1$PedigreePar$sire) |> mean(), 
     variance=table(par1$PedigreePar$sire) |> var())
 
-round(female, 1)
+rbind(female=round(female, 1), male=round(male, 1))
+```
 
-round(male, 1)
+As would be expected under the theory of sexual selection, the male variance in reproductive success is more than twice that of the female. One male had 13 offspring!  
 
+Now lets take a look at the NEWHYBRIDS assignments of PO pairs.  
+
+```{r}
 assignments <-
   dat2 |> 
   mutate(ID=paste0("s", sample_name)) |> 
@@ -381,27 +435,57 @@ par1par <-
 par1par %>% 
   print(n=nrow(.))
 
-table(par1par$offspring)
+```
 
+Lets tabulate NEWHYBRIDS assignments of the offspring. 
+
+```{r}
+table(par1par$offspring)
+```
+
+Lets break down the `BirthYear` of juveniles in PO pairs.  
+
+```{r}
 par1par <- 
   left_join(x=par1par, y=lhc[c(1, 3)], by=join_by(id==ID)) |> 
   rename(BYid=BirthYear) |> 
   left_join(y=lhc[c(1, 3)], by=join_by(dam==ID)) |> 
   rename(BYdam=BirthYear) |> 
   left_join(y=lhc[c(1, 3)], by=join_by(sire==ID)) |> 
-  rename(BYsire=BirthYear)
+  rename(BYsire=BirthYear) |> 
+  select(-OHdam, -OHsire, -MEpair)
 
 par1par %>% 
   print(n=nrow(.))
+
+```
+
+Lets look at NEWHYBRIDS assignments of all parents. 
+
+```{r}
 
 table(par1par$maternal)
 
 table(par1par$paternal)
 
-table(par1par$offspring, par1par$maternal)
+```
 
+Lets look at NEWHYBRIDS assignments of all maternal PO pairs. The maternal assignment is by column and their offspring's assignment is by row.
+
+```{r}
+table(par1par$offspring, par1par$maternal)
+```
+
+NEWHYBRIDS assignments of paternal PO pairs. The paternal assignment is by column and their offspring's assignment is by row.
+
+```{r}
 table(par1par$offspring, par1par$paternal)
 
+```
+
+Lets see what the inferred/assumed age distribution of juvenile parents looks like.
+
+```{r}
 par1par <- 
   mutate(par1par, BYid_BYdam=BYid-BYdam, BYid_BYsire=BYid-BYsire)
 
@@ -412,16 +496,55 @@ page <-
     frequency=c(table(par1par$BYid_BYdam)/sum(table(par1par$BYid_BYdam)), table(par1par$BYid_BYsire)/sum(table(par1par$BYid_BYsire))), 
     sex=c(rep("female", 5), rep("male", 5)))
 
-ggplot(page, mapping=aes(x=age, y=frequency, fill=sex)) + 
-  geom_col(position="dodge")
+ggplot(page, mapping=aes(x=age, y=count, fill=sex)) + 
+  geom_col(position="dodge") + 
+  labs(title="Inferred age structure of juvenile parents assuming no yearling LH")
 
+```
 
+Lets look at parentage assignments where the mother or father are adults. 
+
+```{r}
 filter(
   par1par, 
   grepl(pattern="^a", id) | 
     grepl(pattern="^a", dam) | 
     grepl(pattern="^a", sire)) |> 
-  select(-MEpair, -BYdam, -BYid_BYdam, -BYid_BYsire) %>% 
+  select(-BYdam, -BYsire, -BYid_BYdam, -BYid_BYsire) %>% 
   print(n=nrow(.))
 
 ```
+
+The results above are mostly sensible. Row 17 does not make sense, because an adult transported to the spawning grounds in fall of 2019 cannot possibly sire offspring sampled in spring of 2019. 
+
+Lets look at female tabs.  
+
+```{r}
+filter(
+  par1par, 
+  grepl(pattern="^a", id) | 
+    grepl(pattern="^a", dam) | 
+    grepl(pattern="^a", sire)) |> 
+  group_by(dam) |> 
+  count() |> 
+  ungroup() |> 
+  filter(!is.na(dam)) %>% 
+  print(n=nrow(.))
+```
+
+Male tabs.  
+
+```{r}
+filter(
+  par1par, 
+  grepl(pattern="^a", id) | 
+    grepl(pattern="^a", dam) | 
+    grepl(pattern="^a", sire)) |> 
+  group_by(sire) |> 
+  count() |> 
+  ungroup() |> 
+  filter(!is.na(sire)) %>% 
+  print(n=nrow(.))
+```
+
+I would have expected higher variance in the number of offspring of adult males.  

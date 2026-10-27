@@ -1,5 +1,8 @@
-p75matrix
+Exploratory data filtering and parentage analysis of 95 adult and 9,008
+juvenile Nisqually River Chinook salmon
 ================
+
+Load package libraries and set working directory.
 
 ``` r
 library(readxl)
@@ -24,7 +27,9 @@ library(ASRgenomics)
 setwd("~/Google Drive/My Drive/Nisqually/Nisqually/")
 ```
 
-### get vector of sheet names
+Adrian provided an MS Excel workbook containing genotypes and other
+information. To import the genotypes, we first need to get the names of
+the worksheets, as follows:
 
 ``` r
 excel_sheets("../data-from-Adrian/Nisqually Chinook genotypes.xlsx")
@@ -37,7 +42,8 @@ excel_sheets("../data-from-Adrian/Nisqually Chinook genotypes.xlsx")
     ##  [9] "genepop with assignments"    " genepop by origin"         
     ## [11] "UO gp"
 
-### import data
+Now we can import genotype data from 2 worksheets and join them
+together.
 
 ``` r
 dat <- 
@@ -55,7 +61,9 @@ dat <-
   select(-random)
 ```
 
-### cleanup column names
+The column names include problematic characters such as whitespaces,
+dashes, periods, etc. Lets cleanup the column names by replacing all of
+those problematic characters with an underscore.
 
 ``` r
 names(dat) <- 
@@ -65,38 +73,11 @@ names(dat) <-
   gsub(pattern="'", replacement="_") |> 
   gsub(pattern=".", replacement="_", fixed=TRUE) |> 
   gsub(pattern="%", replacement="percent", fixed=TRUE)
-
-print(dat)
 ```
 
-    ## # A tibble: 9,103 × 319
-    ##    USE_sample_name Alt_ID code  Green_DB_collection_name genotyping_year Library
-    ##    <chr>           <chr>  <chr> <chr>                    <chr>           <chr>  
-    ##  1 13QW0001_02     <NA>   13QW  2013 Nisqually Smolt Tr… 2018            L0036  
-    ##  2 13QW0001_03     <NA>   13QW  2013 Nisqually Smolt Tr… 2018            L0036  
-    ##  3 13QW0001_04     <NA>   13QW  2013 Nisqually Smolt Tr… 2018            L0036  
-    ##  4 13QW0001_05     <NA>   13QW  2013 Nisqually Smolt Tr… 2018            L0036  
-    ##  5 13QW0001_06     <NA>   13QW  2013 Nisqually Smolt Tr… 2018            L0036  
-    ##  6 13QW0001_07     <NA>   13QW  2013 Nisqually Smolt Tr… 2018            L0036  
-    ##  7 13QW0001_08     <NA>   13QW  2013 Nisqually Smolt Tr… 2018            L0036  
-    ##  8 13QW0001_09     <NA>   13QW  2013 Nisqually Smolt Tr… 2018            L0036  
-    ##  9 13QW0001_10     <NA>   13QW  2013 Nisqually Smolt Tr… 2018            L0036  
-    ## 10 13QW0001_11     <NA>   13QW  2013 Nisqually Smolt Tr… 2018            L0036  
-    ## # ℹ 9,093 more rows
-    ## # ℹ 313 more variables: Plate <chr>, Well <chr>, IFI <chr>, Life_history <chr>,
-    ## #   `__` <chr>, AA <chr>, CC <chr>, GG <chr>, TT <chr>, homozygosity <chr>,
-    ## #   species_ID <chr>, Sex_ID <chr>, count <chr>, percent <chr>,
-    ## #   Ots_SEXY3_1 <chr>, Ots_100884_287 <chr>, Ots_101119_381 <chr>,
-    ## #   Ots_101554_407 <chr>, Ots_101704_143 <chr>, Ots_101770_82 <chr>,
-    ## #   Ots_102213_210 <chr>, Ots_102414_395 <chr>, Ots_102457_132 <chr>, …
-
-``` r
-table(dat$Life_history, useNA="ifany")
-```
-
-    ## 
-    ##    adult juvenile 
-    ##       95     9008
+Now lets import NEWHYBRIDS assignments that were provided by Adrian.
+These include assignments for the juveniles only (all 95 adults are
+Clear Creek HORs).
 
 ``` r
 dat2 <-
@@ -112,23 +93,15 @@ dat2 <-
     ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
 
 ``` r
-print(dat2)
+glimpse(dat2)
 ```
 
-    ## # A tibble: 9,008 × 2
-    ##    sample_name newhybrids
-    ##    <chr>       <chr>     
-    ##  1 13QW0001_02 F1Hybrid  
-    ##  2 13QW0001_03 ClearCreek
-    ##  3 13QW0001_04 ClearCreek
-    ##  4 13QW0001_05 unassigned
-    ##  5 13QW0001_06 UO        
-    ##  6 13QW0001_07 ClearCreek
-    ##  7 13QW0001_08 unassigned
-    ##  8 13QW0001_09 unassigned
-    ##  9 13QW0001_10 ClearCreek
-    ## 10 13QW0001_11 F1Hybrid  
-    ## # ℹ 8,998 more rows
+    ## Rows: 9,008
+    ## Columns: 2
+    ## $ sample_name <chr> "13QW0001_02", "13QW0001_03", "13QW0001_04", "13QW0001_05"…
+    ## $ newhybrids  <chr> "F1Hybrid", "ClearCreek", "ClearCreek", "unassigned", "UO"…
+
+Lets tabulate the juvenile NEWHYBRIDS assignments.
 
 ``` r
 table(dat2$newhybrids)
@@ -137,6 +110,12 @@ table(dat2$newhybrids)
     ## 
     ## ClearCreek   F1Hybrid unassigned         UO 
     ##       3082        772        997       4157
+
+Lets construct a Life History (LH) table for the parentage analysis. For
+juveniles, we set the `BirthYear` to the year before sample collection,
+which is encoded as the first 2-digits of the DFW sample names. For
+example, `BirthYear` of sample `13QW0001_02` would be `2012`. This
+assumes no yearling LH.
 
 ``` r
 lh <- 
@@ -148,24 +127,16 @@ lh$BirthYear[1:9008] <-
 
 lh$BirthYear[9009:9103] <- 
   NA
+```
 
+For adults, we set the `BY.min` and `BY.max` to 6 and 2 years before the
+sample collection year, respectively. For instance, `BY.min` and
+`BY.max` of sample `18QN2832` would be `2012` and `2016`, respectively.
+
+``` r
 lh <- 
   mutate(lh, BY.min=NA, BY.max=NA)
 
-table(lh$BirthYear, lh$Sex, useNA="ifany")
-```
-
-    ##       
-    ##           F    M no data
-    ##   2012  662  730       3
-    ##   2013  635  629       9
-    ##   2014  568  617       2
-    ##   2017  851  844      10
-    ##   2018  721  736      20
-    ##   2019 1015  925      31
-    ##   <NA>   51   44       0
-
-``` r
 lh$BY.min[9009:9103] <- 
   str_extract(string=lh$ID[9009:9103], pattern="^\\d{2}") |> 
   as.numeric() + 2000 - 6
@@ -173,8 +144,11 @@ lh$BY.min[9009:9103] <-
 lh$BY.max[9009:9103] <- 
   str_extract(string=lh$ID[9009:9103], pattern="^\\d{2}") |> 
   as.numeric() + 2000 - 2
+```
 
+Recode F,M as 1,2.
 
+``` r
 lh$Sex <- 
   gsub(pattern="F", replacement=1, lh$Sex) |>
   gsub(pattern="M", replacement=2) |>
@@ -203,6 +177,9 @@ tail(lh)
     ## 5 adult        17RK3142     2        NA   2011   2015
     ## 6 adult        18QN2612     1        NA   2012   2016
 
+DFW filters individuals with IFI scores greater than 2.5. Lets see what
+that looks like.
+
 ``` r
 mutate(dat, IFI=as.double(IFI)) |> 
   ggplot(aes(x=IFI)) + 
@@ -215,14 +192,21 @@ mutate(dat, IFI=as.double(IFI)) |>
     ## Warning: Removed 7 rows containing non-finite outside the scale range
     ## (`stat_bin()`).
 
-![](p75matrix_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+![](p75matrix_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+
+Lets go ahead and filter individuals with IFI scores greater than 2.5.
 
 ``` r
 gt <- 
   mutate(dat, IFI=as.double(IFI)) |>
   filter(IFI<=2.5) |>
   select(ID=USE_sample_name, 22:319)
+```
 
+Here we are prepending sample names with “s” or “a” to indicate smolt or
+adult, and wrangling LH data.
+
+``` r
 gt$ID[1:8870] <- 
   paste0("s", gt$ID[1:8870])
 
@@ -237,53 +221,28 @@ lh$ID[9009:9103] <-
 
 lh <-
   filter(lh, ID %in% gt$ID)
-
-table(lh$BY.min, lh$BY.max)
 ```
 
-    ##       
-    ##        2015 2016 2017
-    ##   2011   38    0    0
-    ##   2012    0   35    0
-    ##   2013    0    0   22
+Now we will filter exact duplicates.
 
 ``` r
-### filter exact duplicates
 dups <-
   column_to_rownames(gt, "ID")[duplicated(column_to_rownames(gt, "ID")), ] |>
   rownames_to_column("ID") |>
   as_tibble() |>
   select(ID)
 
-print(dups)
-```
-
-    ## # A tibble: 14 × 1
-    ##    ID           
-    ##    <chr>        
-    ##  1 s13QW0004_30 
-    ##  2 s13QW0012_110
-    ##  3 s13QW0013_049
-    ##  4 s13QW0015_010
-    ##  5 s13QW0015_082
-    ##  6 s13QW0015_131
-    ##  7 s13QW0015_132
-    ##  8 s14TZ0002_078
-    ##  9 s14TZ0002_088
-    ## 10 s15JS0005_009
-    ## 11 s15JS0006_008
-    ## 12 s15JS0020_019
-    ## 13 s15JS0054_018
-    ## 14 s15JS0058_007
-
-``` r
 gt <-
   filter(gt, !ID %in% dups$ID)
 
 lh <-
   filter(lh, !ID %in% dups$ID)
+```
 
-### recode INDELs as SNPs
+For parentage analysis with `sequoia()`, we need to recode INDELs as
+SNPs.
+
+``` r
 gt %>% 
   select(where(~any(grepl("-", .x, fixed=TRUE)))) %>% 
   glimpse()
@@ -326,24 +285,31 @@ gt$Ots_vatf_251 <-
   gsub(pattern="-", replacement="A", x=gt$Ots_vatf_251)
 ```
 
+Now lets tabulate the proportion of missing genotypes per individual.
+
 ``` r
 gt <-
   gt |>
   rowwise() |>
   mutate(perc=sum(is.na(c_across(2:299)))/298) |> 
   ungroup()
+```
 
+DFW filters individuals with less than 30% missing genotypes. Lets see
+what that looks like.
+
+``` r
 ggplot(data=gt, mapping=aes(x=perc)) + 
   geom_histogram() + 
   geom_vline(xintercept=0.3, linetype="dashed", colour="red") +
-  labs(x="proportion of missing SNPs")
+  labs(x="proportion of missing genotypes per individual")
 ```
 
     ## `stat_bin()` using `bins = 30`. Pick better value `binwidth`.
 
-![](p75matrix_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+![](p75matrix_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 
-### filter individuals with ≤ 30% missing SNPs
+We’ll go ahead and filter individuals with ≤ 30% missing.
 
 ``` r
 gt <- 
@@ -351,8 +317,13 @@ gt <-
 
 lh <- 
   filter(lh[-1], ID %in% pull(gt, ID))
+```
 
-### recode SNPs as 012
+DFW removes individuals with heterozygous genotypes called at less than
+10% of genotyped loci. Lets see if any individuals meet this criteria.
+
+``` r
+# recode SNPs (e.g., AA, AG, GG) as numeric matrix (i.e., 0, 1, 2)
 gm <- 
   snp.recode(
     M=as.matrix(column_to_rownames(gt[-300], var="ID")), 
@@ -362,15 +333,19 @@ gm <-
     ## Matrix M was recoded from bi-allelic nucleotide bases to numeric.
 
 ``` r
-### remove individuals if heterozygous genotypes were called at fewer than 10% of genotyped loci
 hets <- 
   rowSums(gm$Mrecode==1, na.rm=TRUE) / 
   (rowSums(gm$Mrecode==0, na.rm=TRUE) + rowSums(gm$Mrecode==2, na.rm=TRUE))
 
-round(min(hets)*100, 1) # No filtering needed
+round(min(hets)*100, 1) 
 ```
 
     ## [1] 12.1
+
+No heterozygosity filtering needed.
+
+DFW filters SNPs with less than 10% missing genotypes. Lets see what
+that looks like.
 
 ``` r
 snpstats <- 
@@ -381,20 +356,23 @@ as.data.frame(snpstats) |>
   ggplot(mapping=aes(x=Mis)) + 
   geom_histogram() + 
   geom_vline(xintercept=0.1, linetype="dashed", colour="red") +
-  labs(x="proportion of missing genotypes")
+  labs(x="proportion of missing genotypes per SNP")
 ```
 
     ## `stat_bin()` using `bins = 30`. Pick better value `binwidth`.
 
-![](p75matrix_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+![](p75matrix_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
 
-### filter SNPs with ≥ 90% calls, HWE.p ≥ 0.05/n, and Minor Allele Frequency ≥ 5%
+DFW doesn’t do any filtering based on conformance to Hardy-Weinberg
+Equilibrium (HWE). I think severe violations of HWE are a good
+indication of high genotyping error. Let’s consider filtering SNPs with
+Bonferroni-corrected HWE p-value ≥ 0.05/n (n is number of HWE tests).
 
 ``` r
 as.data.frame(snpstats) |> 
   rownames_to_column("ID") |> 
   ggplot(mapping=aes(x=HWE.p)) + 
-  geom_histogram() + 
+  geom_histogram(bins=100) + 
   scale_x_log10() +
   geom_vline(xintercept=0.05/298, linetype="dashed", colour="red") +
   labs(x="HWE p-value")
@@ -402,21 +380,31 @@ as.data.frame(snpstats) |>
 
     ## Warning in scale_x_log10(): log-10 transformation introduced infinite values.
 
-    ## `stat_bin()` using `bins = 30`. Pick better value `binwidth`.
-
     ## Warning: Removed 15 rows containing non-finite outside the scale range
     ## (`stat_bin()`).
 
-![](p75matrix_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+![](p75matrix_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
 
-### filter SNPs with ≥ 90% calls, HWE.p ≥ 0.05/n, and Minor Allele Frequency ≥ 1%
+Lets filter SNPs with ≥ 90% genotypes and HWE.p ≥ 0.05/n. DFW doesn’t
+filter SNPs based on Minor Allele Frequency (MAF), but I’m going to
+remove SNPs with MAF \< 1%, because these SNPs are unlikely to be
+informative for parentage analysis. Ideally, we would filter SNPs with
+MAF ≥ 30%, so that Parent-Offspring (PO) pairs can be evaluated with
+Opposing Homozygosity (OH) at a sufficient number of SNPs.
 
 ``` r
 p90af99 <-
   as.data.frame(snpstats) |> rownames_to_column("ID") %>%
   filter(Mis<=0.1, HWE.p>=0.05/nrow(.), AF<=0.99) |>
   as_tibble()
+```
 
+A total of 180 SNPs remain after filtering. Most of these SNPs will be
+uninformative for parentage analysis because they have low MAFs (only 64
+SNPs with MAF ≥ 30%, which is recommended MAF filtering for parentage
+with `sequoia()`).
+
+``` r
 p90af99 %>% 
   print(n=nrow(.))
 ```
@@ -605,6 +593,9 @@ p90af99 %>%
     ## 179 Ots_unk7936_50_G_C    0.728 0.0218   0.344   
     ## 180 Ots_unk9480_51_C_G    0.772 0.000671 0.835
 
+Now we’re going to check for duplicates and filter the duplicate samples
+with more genotypes. We do this 2x to remove all potential duplicates.
+
 ``` r
 gm75 <- 
   snp.recode(
@@ -625,14 +616,12 @@ gm75 <-
     ## ✔ Genotype matrix looks OK! There are  8941  individuals and  180  SNPs.
 
 ``` r
-### check for duplicates
 dup1 <- 
   sequoia(
     GenoM=gm75, 
     LifeHistData=as.data.frame(lh), 
     Module="dup", 
     quiet="verbose", 
-    args.AP=list(MinAgeParent=2),
     Plot=FALSE)
 ```
 
@@ -665,7 +654,7 @@ dup1 <-
     ## removing
 
 ``` r
-### filter duplicates with most calls
+# filter duplicates with most calls
 dup1cut <- 
   bind_cols(
     filter(gt, ID %in% dup1$DupGenotype$ID1) |> select(ID1=ID, perc1=perc), 
@@ -721,14 +710,13 @@ dim(lhc)
     ## [1] 8841    5
 
 ``` r
-### check for duplicates again
+# check for duplicates again
 dup2 <- 
   sequoia(
     GenoM=gm75c, 
     LifeHistData=as.data.frame(lhc), 
     Module="dup",
     quiet="verbose", 
-    args.AP=list(MinAgeParent=2),
     Plot=FALSE)
 ```
 
@@ -767,7 +755,8 @@ dup2cut <-
   mutate(ID=if_else(condition=perc1<=perc2, true=ID2, false=ID1))
 ```
 
-### estimate parentage
+Okay, now we’re ready to infer parentage. We include min=2 and max=6 age
+constraints for parents (the default would be min=1 and max=9).
 
 ``` r
 par1 <- 
@@ -815,12 +804,12 @@ par1 <-
     ## 
     ##  Time    |  R |  Step      |  Progress  | Dams  | Sires |  GPs  |   Total LL 
     ## -------- | -- | ---------- | ---------- | ----- | ----- | ----- | ----------
-    ## 12:05:27 |  0 | count OH   |            | 
-    ## 12:05:27 |  0 | initial    |            |     0 |     0 |     0 |  -505624.0 
-    ## 12:05:27 |  1 | parents    | .......... |    81 |    91 |     0 |  -504261.2 
-    ## 12:05:42 |  2 | parents    | .......... |    83 |    92 |     0 |  -504256.0 
-    ## 12:05:56 |  3 | parents    | .......... |    83 |    92 |     0 |  -504256.0 
-    ## 12:06:11 | 99 | est byears | .......... |
+    ## 15:42:02 |  0 | count OH   |            | 
+    ## 15:42:02 |  0 | initial    |            |     0 |     0 |     0 |  -505624.0 
+    ## 15:42:02 |  1 | parents    | .......... |    81 |    91 |     0 |  -504261.2 
+    ## 15:42:16 |  2 | parents    | .......... |    83 |    92 |     0 |  -504256.0 
+    ## 15:42:30 |  3 | parents    | .......... |    83 |    92 |     0 |  -504256.0 
+    ## 15:42:43 | 99 | est byears | .......... |
 
     ## ✔ assigned 83 dams and 92 sires to 8831 individuals
 
@@ -829,6 +818,11 @@ par1 <-
 
     ## ℹ Run `GetMaybeRel()` conditional on this pedigree to check for any
     ## non-assigned parents
+
+Lets look at the parentage results. `OHdam`, `OHsire` show the Opposing
+Homozygosity (OH) counts for PO pairs, and `MEpair` is the number of
+Mendelian Errors (ME) for PO trios. OH and ME other than 0 arise from
+genotyping errors, so ideally these would all be zero.
 
 ``` r
 filter(par1$PedigreePar, !is.na(dam) | !is.na(sire)) |> 
@@ -1014,18 +1008,24 @@ filter(par1$PedigreePar, !is.na(dam) | !is.na(sire)) |>
     ## 172 s20LV2123     <NA>          s18GX0185_3      NA      0     NA
     ## 173 s20LV2327     <NA>          s15JS0042_012    NA      1     NA
 
+Now lets take a look at parentage through the lens of sexual selection,
+which predicts that males would exhibit higher variance in reproductive
+success than females.
+
 ``` r
 tibble(
   x=c(table(par1$PedigreePar$dam), table(par1$PedigreePar$sire)), 
   sex=c(rep("female", table(par1$PedigreePar$dam) |> length()), rep("male", table(par1$PedigreePar$sire) |> length()))) |> 
   ggplot(aes(x=x, fill=sex)) + 
   geom_histogram(position="dodge") + 
-  labs(x="number of offspring", title="Males exhibit higher variance in reproductive success")
+  labs(x="number of offspring", title="Do males exhibit higher variance in reproductive success?")
 ```
 
     ## `stat_bin()` using `bins = 30`. Pick better value `binwidth`.
 
-![](p75matrix_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+![](p75matrix_files/figure-gfm/unnamed-chunk-26-1.png)<!-- -->
+
+Lets crunch the numbers and see…
 
 ``` r
 female <- 
@@ -1036,18 +1036,18 @@ male <-
   c(mean=table(par1$PedigreePar$sire) |> mean(), 
     variance=table(par1$PedigreePar$sire) |> var())
 
-round(female, 1)
+rbind(female=round(female, 1), male=round(male, 1))
 ```
 
-    ##     mean variance 
-    ##      1.6      1.6
+    ##        mean variance
+    ## female  1.6      1.6
+    ## male    1.6      3.6
 
-``` r
-round(male, 1)
-```
+As would be expected under the theory of sexual selection, the male
+variance in reproductive success is more than twice that of the female.
+One male had 13 offspring!
 
-    ##     mean variance 
-    ##      1.6      3.6
+Now lets take a look at the NEWHYBRIDS assignments of PO pairs.
 
 ``` r
 assignments <-
@@ -1248,6 +1248,8 @@ par1par %>%
     ## 172 s20LV2123     <NA>     s18G…    NA      0     NA unassign… <NA>     UO      
     ## 173 s20LV2327     <NA>     s15J…    NA      1     NA UO        <NA>     UO
 
+Lets tabulate NEWHYBRIDS assignments of the offspring.
+
 ``` r
 table(par1par$offspring)
 ```
@@ -1256,6 +1258,8 @@ table(par1par$offspring)
     ## ClearCreek   F1Hybrid unassigned         UO 
     ##         37         12         12        112
 
+Lets break down the `BirthYear` of juveniles in PO pairs.
+
 ``` r
 par1par <- 
   left_join(x=par1par, y=lhc[c(1, 3)], by=join_by(id==ID)) |> 
@@ -1263,189 +1267,191 @@ par1par <-
   left_join(y=lhc[c(1, 3)], by=join_by(dam==ID)) |> 
   rename(BYdam=BirthYear) |> 
   left_join(y=lhc[c(1, 3)], by=join_by(sire==ID)) |> 
-  rename(BYsire=BirthYear)
+  rename(BYsire=BirthYear) |> 
+  select(-OHdam, -OHsire, -MEpair)
 
 par1par %>% 
   print(n=nrow(.))
 ```
 
-    ## # A tibble: 173 × 12
-    ##     id         dam   sire  OHdam OHsire MEpair offspring maternal paternal  BYid
-    ##     <chr>      <chr> <chr> <int>  <int>  <int> <chr>     <chr>    <chr>    <int>
-    ##   1 s15JS0034… <NA>  s13Q…    NA      0     NA UO        <NA>     UO        2014
-    ##   2 s18GX0010… <NA>  s14T…    NA      0     NA ClearCre… <NA>     ClearCr…  2017
-    ##   3 s18GX0039… s15J… <NA>      0     NA     NA UO        unassig… <NA>      2017
-    ##   4 s18GX0045… s13Q… <NA>      0     NA     NA UO        UO       <NA>      2017
-    ##   5 s18GX0054… <NA>  a17R…    NA      0     NA ClearCre… <NA>     ClearCr…  2017
-    ##   6 s18GX0060… <NA>  a17R…    NA      0     NA ClearCre… <NA>     ClearCr…  2017
-    ##   7 s18GX0067… a17R… <NA>      0     NA     NA ClearCre… ClearCr… <NA>      2017
-    ##   8 s18GX0067… a17R… <NA>      0     NA     NA ClearCre… ClearCr… <NA>      2017
-    ##   9 s18GX0068… a17R… <NA>      0     NA     NA ClearCre… ClearCr… <NA>      2017
-    ##  10 s18GX0070… <NA>  s15J…    NA      1     NA UO        <NA>     UO        2017
-    ##  11 s18GX0075… a17R… <NA>      0     NA     NA ClearCre… ClearCr… <NA>      2017
-    ##  12 s18GX0077… s14T… <NA>      0     NA     NA ClearCre… ClearCr… <NA>      2017
-    ##  13 s18GX0078… <NA>  s14T…    NA      0     NA F1Hybrid  <NA>     ClearCr…  2017
-    ##  14 s18GX0078… a17R… <NA>      0     NA     NA ClearCre… ClearCr… <NA>      2017
-    ##  15 s18GX0079… s14T… <NA>      0     NA     NA F1Hybrid  ClearCr… <NA>      2017
-    ##  16 s18GX0083… s14T… <NA>      0     NA     NA unassign… ClearCr… <NA>      2017
-    ##  17 s18GX0089… <NA>  s15J…    NA      0     NA UO        <NA>     UO        2017
-    ##  18 s18GX0093… s15J… <NA>      0     NA     NA unassign… UO       <NA>      2017
-    ##  19 s18GX0095… <NA>  s15J…    NA      0     NA F1Hybrid  <NA>     ClearCr…  2017
-    ##  20 s18GX0097… s14T… <NA>      0     NA     NA F1Hybrid  ClearCr… <NA>      2017
-    ##  21 s18GX0114… s13Q… <NA>      1     NA     NA ClearCre… F1Hybrid <NA>      2017
-    ##  22 s18GX0122… s14T… <NA>      0     NA     NA F1Hybrid  ClearCr… <NA>      2017
-    ##  23 s18GX0123… <NA>  s14T…    NA      1     NA ClearCre… <NA>     ClearCr…  2017
-    ##  24 s18GX0133… a17R… <NA>      0     NA     NA ClearCre… ClearCr… <NA>      2017
-    ##  25 s18GX0138… <NA>  s15J…    NA      0     NA UO        <NA>     UO        2017
-    ##  26 s18GX0141… <NA>  s14T…    NA      0     NA ClearCre… <NA>     ClearCr…  2017
-    ##  27 s18GX0145… <NA>  s15J…    NA      1     NA UO        <NA>     UO        2017
-    ##  28 s18GX0146… <NA>  s15J…    NA      0     NA F1Hybrid  <NA>     ClearCr…  2017
-    ##  29 s18GX0148… s14T… <NA>      0     NA     NA ClearCre… ClearCr… <NA>      2017
-    ##  30 s18GX0151… s15J… <NA>      0     NA     NA UO        unassig… <NA>      2017
-    ##  31 s18GX0153… s13Q… <NA>      0     NA     NA ClearCre… ClearCr… <NA>      2017
-    ##  32 s18GX0154… a17R… <NA>      0     NA     NA ClearCre… ClearCr… <NA>      2017
-    ##  33 s18GX0157… <NA>  s15J…    NA      0     NA UO        <NA>     UO        2017
-    ##  34 s18GX0158… <NA>  a17R…    NA      0     NA ClearCre… <NA>     ClearCr…  2017
-    ##  35 s18GX0160… <NA>  s15J…    NA      0     NA unassign… <NA>     ClearCr…  2017
-    ##  36 s18GX0161… s15J… <NA>      0     NA     NA UO        UO       <NA>      2017
-    ##  37 s18GX0163… <NA>  a17R…    NA      0     NA ClearCre… <NA>     ClearCr…  2017
-    ##  38 s18GX0163… <NA>  a17R…    NA      0     NA ClearCre… <NA>     ClearCr…  2017
-    ##  39 s18GX0167… s15J… <NA>      0     NA     NA UO        UO       <NA>      2017
-    ##  40 s18GX0170… <NA>  s15J…    NA      0     NA UO        <NA>     F1Hybrid  2017
-    ##  41 s18GX0178… s15J… <NA>      0     NA     NA UO        UO       <NA>      2017
-    ##  42 s18GX0181… s14T… <NA>      0     NA     NA UO        UO       <NA>      2017
-    ##  43 s18GX0185… <NA>  s15J…    NA      0     NA UO        <NA>     UO        2017
-    ##  44 s18GX0186… <NA>  s15J…    NA      0     NA UO        <NA>     UO        2017
-    ##  45 s18GX0190… <NA>  s15J…    NA      0     NA F1Hybrid  <NA>     UO        2017
-    ##  46 s18GX0192… <NA>  a17R…    NA      0     NA ClearCre… <NA>     ClearCr…  2017
-    ##  47 s18GX0193… s14T… <NA>      0     NA     NA UO        UO       <NA>      2017
-    ##  48 s18GX0196… s15J… <NA>      0     NA     NA UO        unassig… <NA>      2017
-    ##  49 s18GX0199… s15J… <NA>      1     NA     NA UO        UO       <NA>      2017
-    ##  50 s18GX0203… <NA>  s15J…    NA      1     NA UO        <NA>     UO        2017
-    ##  51 s18GX0206… <NA>  s15J…    NA      0     NA F1Hybrid  <NA>     ClearCr…  2017
-    ##  52 s18GX0207… <NA>  a17R…    NA      0     NA ClearCre… <NA>     ClearCr…  2017
-    ##  53 s18GX0208… <NA>  s15J…    NA      0     NA F1Hybrid  <NA>     ClearCr…  2017
-    ##  54 s18GX0217… s15J… <NA>      0     NA     NA UO        UO       <NA>      2017
-    ##  55 s18GX0217… <NA>  s15J…    NA      0     NA unassign… <NA>     UO        2017
-    ##  56 s18GX0217… <NA>  s15J…    NA      0     NA UO        <NA>     UO        2017
-    ##  57 s18GX0228… <NA>  s15J…    NA      0     NA UO        <NA>     UO        2017
-    ##  58 s18GX0231… <NA>  s14T…    NA      0     NA UO        <NA>     UO        2017
-    ##  59 s18GX0235… s15J… s15J…     0      0      0 UO        unassig… UO        2017
-    ##  60 s18GX0239… s15J… <NA>      0     NA     NA UO        unassig… <NA>      2017
-    ##  61 s18GX0240… s15J… <NA>      0     NA     NA UO        UO       <NA>      2017
-    ##  62 s18GX0241… <NA>  s15J…    NA      0     NA UO        <NA>     unassig…  2017
-    ##  63 s18GX0243… s15J… <NA>      0     NA     NA UO        unassig… <NA>      2017
-    ##  64 s18GX0243… <NA>  s15J…    NA      0     NA UO        <NA>     UO        2017
-    ##  65 s18GX0244… <NA>  s14T…    NA      0     NA UO        <NA>     UO        2017
-    ##  66 s18GX0246… s15J… s15J…     0      0      0 UO        unassig… UO        2017
-    ##  67 s18GX0247… <NA>  s15J…    NA      0     NA UO        <NA>     UO        2017
-    ##  68 s18GX0247… <NA>  s14T…    NA      0     NA UO        <NA>     UO        2017
-    ##  69 s18GX0248… s15J… <NA>      0     NA     NA unassign… unassig… <NA>      2017
-    ##  70 s18GX0254… s15J… <NA>      0     NA     NA UO        UO       <NA>      2017
-    ##  71 s18GX0261… <NA>  s15J…    NA      0     NA UO        <NA>     UO        2017
-    ##  72 s18GX0275… <NA>  s15J…    NA      0     NA UO        <NA>     UO        2017
-    ##  73 s18GX0276… s14T… <NA>      0     NA     NA UO        UO       <NA>      2017
-    ##  74 s18GX0277… <NA>  a17R…    NA      0     NA ClearCre… <NA>     ClearCr…  2017
-    ##  75 s18GX0278… s15J… <NA>      0     NA     NA unassign… F1Hybrid <NA>      2017
-    ##  76 s18GX0283… <NA>  s15J…    NA      0     NA UO        <NA>     UO        2017
-    ##  77 s18GX0283… s15J… <NA>      0     NA     NA UO        UO       <NA>      2017
-    ##  78 s18GX0283… <NA>  s15J…    NA      0     NA UO        <NA>     UO        2017
-    ##  79 s18GX0285… s15J… <NA>      1     NA     NA F1Hybrid  UO       <NA>      2017
-    ##  80 s18GX0288… s15J… <NA>      0     NA     NA UO        UO       <NA>      2017
-    ##  81 s18GX0291… <NA>  s15J…    NA      0     NA UO        <NA>     UO        2017
-    ##  82 s18GX0294… <NA>  s15J…    NA      0     NA UO        <NA>     UO        2017
-    ##  83 s18GX0298… <NA>  s15J…    NA      0     NA UO        <NA>     UO        2017
-    ##  84 s18GX0298… s15J… <NA>      1     NA     NA UO        UO       <NA>      2017
-    ##  85 s18GX0299… <NA>  s15J…    NA      0     NA UO        <NA>     UO        2017
-    ##  86 s18GX0305… <NA>  s15J…    NA      0     NA UO        <NA>     ClearCr…  2017
-    ##  87 s18GX0307… <NA>  s15J…    NA      0     NA UO        <NA>     UO        2017
-    ##  88 s18GX0308… <NA>  s15J…    NA      0     NA UO        <NA>     UO        2017
-    ##  89 s18GX0309… <NA>  s15J…    NA      0     NA UO        <NA>     UO        2017
-    ##  90 s18GX0309… <NA>  s15J…    NA      0     NA UO        <NA>     UO        2017
-    ##  91 s18GX0310… <NA>  s15J…    NA      1     NA UO        <NA>     UO        2017
-    ##  92 s19DY0103  <NA>  s15J…    NA      0     NA UO        <NA>     UO        2018
-    ##  93 s19DY0182  a18Q… <NA>      0     NA     NA unassign… ClearCr… <NA>      2018
-    ##  94 s19DY0211  <NA>  s15J…    NA      1     NA UO        <NA>     unassig…  2018
-    ##  95 s19DY0232  <NA>  a19Q…    NA      0     NA ClearCre… <NA>     ClearCr…  2018
-    ##  96 s19DY0274  s13Q… <NA>      1     NA     NA UO        UO       <NA>      2018
-    ##  97 s19DY0304  a18Q… <NA>      0     NA     NA ClearCre… ClearCr… <NA>      2018
-    ##  98 s19DY0366  s15J… <NA>      0     NA     NA UO        F1Hybrid <NA>      2018
-    ##  99 s19DY0390  <NA>  a18Q…    NA      0     NA ClearCre… <NA>     ClearCr…  2018
-    ## 100 s19DY0472  a18Q… <NA>      0     NA     NA ClearCre… ClearCr… <NA>      2018
-    ## 101 s19DY0494  s15J… <NA>      1     NA     NA F1Hybrid  UO       <NA>      2018
-    ## 102 s19DY0506  s15J… <NA>      1     NA     NA UO        unassig… <NA>      2018
-    ## 103 s19DY0651  <NA>  s15J…    NA      0     NA UO        <NA>     F1Hybrid  2018
-    ## 104 s19DY0704  s15J… <NA>      0     NA     NA UO        UO       <NA>      2018
-    ## 105 s19DY0769  s15J… <NA>      1     NA     NA UO        unassig… <NA>      2018
-    ## 106 s19DY0781  s15J… <NA>      0     NA     NA UO        F1Hybrid <NA>      2018
-    ## 107 s19DY0784  <NA>  s15J…    NA      0     NA UO        <NA>     F1Hybrid  2018
-    ## 108 s19DY0793  <NA>  s15J…    NA      0     NA UO        <NA>     unassig…  2018
-    ## 109 s19DY0840  a18Q… <NA>      0     NA     NA ClearCre… ClearCr… <NA>      2018
-    ## 110 s19DY0870  s15J… <NA>      0     NA     NA UO        UO       <NA>      2018
-    ## 111 s19DY0871  <NA>  s15J…    NA      0     NA UO        <NA>     UO        2018
-    ## 112 s19DY0883  s15J… <NA>      0     NA     NA UO        F1Hybrid <NA>      2018
-    ## 113 s19DY0929  s15J… <NA>      0     NA     NA UO        F1Hybrid <NA>      2018
-    ## 114 s19DY0970  <NA>  s15J…    NA      0     NA UO        <NA>     unassig…  2018
-    ## 115 s19DY0979  s15J… <NA>      0     NA     NA UO        F1Hybrid <NA>      2018
-    ## 116 s19DY1012  s15J… <NA>      0     NA     NA UO        unassig… <NA>      2018
-    ## 117 s19DY1015  s15J… <NA>      0     NA     NA F1Hybrid  UO       <NA>      2018
-    ## 118 s19DY1028  s15J… <NA>      0     NA     NA UO        UO       <NA>      2018
-    ## 119 s19DY1029  <NA>  s15J…    NA      1     NA UO        <NA>     UO        2018
-    ## 120 s19DY1030  <NA>  s15J…    NA      0     NA UO        <NA>     unassig…  2018
-    ## 121 s19DY1061  s14T… <NA>      1     NA     NA ClearCre… ClearCr… <NA>      2018
-    ## 122 s19DY1065  <NA>  a18Q…    NA      0     NA unassign… <NA>     ClearCr…  2018
-    ## 123 s19DY1069  <NA>  s15J…    NA      0     NA UO        <NA>     ClearCr…  2018
-    ## 124 s19DY1077  s15J… <NA>      1     NA     NA UO        UO       <NA>      2018
-    ## 125 s19DY1102  <NA>  s15J…    NA      0     NA UO        <NA>     ClearCr…  2018
-    ## 126 s19DY1134  s15J… <NA>      0     NA     NA UO        unassig… <NA>      2018
-    ## 127 s19DY1151  s15J… <NA>      0     NA     NA UO        UO       <NA>      2018
-    ## 128 s19DY1170  <NA>  s15J…    NA      0     NA UO        <NA>     ClearCr…  2018
-    ## 129 s19DY1175  s15J… <NA>      0     NA     NA UO        UO       <NA>      2018
-    ## 130 s19DY1190  s15J… <NA>      0     NA     NA UO        UO       <NA>      2018
-    ## 131 s19DY1212  <NA>  s15J…    NA      0     NA UO        <NA>     ClearCr…  2018
-    ## 132 s19DY1221  <NA>  s15J…    NA      0     NA UO        <NA>     UO        2018
-    ## 133 s19DY1222  s13Q… <NA>      0     NA     NA UO        unassig… <NA>      2018
-    ## 134 s19DY1238  <NA>  s15J…    NA      1     NA UO        <NA>     UO        2018
-    ## 135 s19DY1293  s15J… <NA>      0     NA     NA UO        ClearCr… <NA>      2018
-    ## 136 s19DY1299  <NA>  s15J…    NA      0     NA UO        <NA>     UO        2018
-    ## 137 s19DY1304  <NA>  s15J…    NA      0     NA UO        <NA>     ClearCr…  2018
-    ## 138 s19DY1333  <NA>  s15J…    NA      0     NA UO        <NA>     UO        2018
-    ## 139 s19DY1339  s15J… <NA>      1     NA     NA UO        UO       <NA>      2018
-    ## 140 s19DY1344  <NA>  s15J…    NA      0     NA UO        <NA>     ClearCr…  2018
-    ## 141 s19DY1351  s15J… <NA>      0     NA     NA UO        UO       <NA>      2018
-    ## 142 s19DY1357  <NA>  s15J…    NA      0     NA UO        <NA>     ClearCr…  2018
-    ## 143 s19DY1391  <NA>  s15J…    NA      1     NA UO        <NA>     UO        2018
-    ## 144 s19DY1409  s15J… <NA>      0     NA     NA UO        UO       <NA>      2018
-    ## 145 s19DY1410  s14T… <NA>      1     NA     NA unassign… unassig… <NA>      2018
-    ## 146 s19DY1413  <NA>  s15J…    NA      0     NA UO        <NA>     ClearCr…  2018
-    ## 147 s19DY1434  <NA>  s15J…    NA      1     NA UO        <NA>     UO        2018
-    ## 148 s19DY1462  <NA>  s15J…    NA      0     NA UO        <NA>     UO        2018
-    ## 149 s19DY1470  <NA>  s14T…    NA      2     NA UO        <NA>     unassig…  2018
-    ## 150 s19DY1497  s15J… <NA>      0     NA     NA UO        UO       <NA>      2018
-    ## 151 s20LV0012  <NA>  a19Q…    NA      0     NA ClearCre… <NA>     ClearCr…  2019
-    ## 152 s20LV0419  <NA>  s15J…    NA      0     NA unassign… <NA>     F1Hybrid  2019
-    ## 153 s20LV0456  <NA>  s14T…    NA      0     NA ClearCre… <NA>     ClearCr…  2019
-    ## 154 s20LV0517  s18G… <NA>      0     NA     NA ClearCre… ClearCr… <NA>      2019
-    ## 155 s20LV0679  <NA>  s15J…    NA      1     NA unassign… <NA>     UO        2019
-    ## 156 s20LV0783  a19Q… <NA>      0     NA     NA ClearCre… ClearCr… <NA>      2019
-    ## 157 s20LV0945  <NA>  s14T…    NA      0     NA UO        <NA>     UO        2019
-    ## 158 s20LV1084  a19Q… <NA>      0     NA     NA ClearCre… ClearCr… <NA>      2019
-    ## 159 s20LV1190  s15J… <NA>      0     NA     NA UO        unassig… <NA>      2019
-    ## 160 s20LV1204  s18G… <NA>      0     NA     NA ClearCre… ClearCr… <NA>      2019
-    ## 161 s20LV1261  s15J… <NA>      0     NA     NA UO        UO       <NA>      2019
-    ## 162 s20LV1328  <NA>  a19Q…    NA      0     NA ClearCre… <NA>     ClearCr…  2019
-    ## 163 s20LV1350  a19Q… <NA>      0     NA     NA ClearCre… ClearCr… <NA>      2019
-    ## 164 s20LV1357  s15J… <NA>      0     NA     NA UO        UO       <NA>      2019
-    ## 165 s20LV1453  <NA>  s14T…    NA      0     NA UO        <NA>     UO        2019
-    ## 166 s20LV1710  <NA>  s14T…    NA      1     NA UO        <NA>     UO        2019
-    ## 167 s20LV1753  <NA>  s18G…    NA      1     NA UO        <NA>     UO        2019
-    ## 168 s20LV1765  s18G… <NA>      0     NA     NA UO        UO       <NA>      2019
-    ## 169 s20LV1785  s18G… <NA>      0     NA     NA ClearCre… UO       <NA>      2019
-    ## 170 s20LV1906  s18G… <NA>      0     NA     NA UO        UO       <NA>      2019
-    ## 171 s20LV2062  s18G… <NA>      0     NA     NA UO        UO       <NA>      2019
-    ## 172 s20LV2123  <NA>  s18G…    NA      0     NA unassign… <NA>     UO        2019
-    ## 173 s20LV2327  <NA>  s15J…    NA      1     NA UO        <NA>     UO        2019
-    ## # ℹ 2 more variables: BYdam <int>, BYsire <int>
+    ## # A tibble: 173 × 9
+    ##     id            dam       sire  offspring maternal paternal  BYid BYdam BYsire
+    ##     <chr>         <chr>     <chr> <chr>     <chr>    <chr>    <int> <int>  <int>
+    ##   1 s15JS0034_005 <NA>      s13Q… UO        <NA>     UO        2014    NA   2012
+    ##   2 s18GX0010_1   <NA>      s14T… ClearCre… <NA>     ClearCr…  2017    NA   2013
+    ##   3 s18GX0039_1   s15JS000… <NA>  UO        unassig… <NA>      2017  2014     NA
+    ##   4 s18GX0045_7   s13QW001… <NA>  UO        UO       <NA>      2017  2012     NA
+    ##   5 s18GX0054_3   <NA>      a17R… ClearCre… <NA>     ClearCr…  2017    NA     NA
+    ##   6 s18GX0060_4   <NA>      a17R… ClearCre… <NA>     ClearCr…  2017    NA     NA
+    ##   7 s18GX0067_5   a17RK3793 <NA>  ClearCre… ClearCr… <NA>      2017    NA     NA
+    ##   8 s18GX0067_8   a17RK2671 <NA>  ClearCre… ClearCr… <NA>      2017    NA     NA
+    ##   9 s18GX0068_5   a17RK3793 <NA>  ClearCre… ClearCr… <NA>      2017    NA     NA
+    ##  10 s18GX0070_6   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  11 s18GX0075_7   a17RK3793 <NA>  ClearCre… ClearCr… <NA>      2017    NA     NA
+    ##  12 s18GX0077_7   s14TZ000… <NA>  ClearCre… ClearCr… <NA>      2017  2013     NA
+    ##  13 s18GX0078_2   <NA>      s14T… F1Hybrid  <NA>     ClearCr…  2017    NA   2013
+    ##  14 s18GX0078_7   a17RK3793 <NA>  ClearCre… ClearCr… <NA>      2017    NA     NA
+    ##  15 s18GX0079_9   s14TZ000… <NA>  F1Hybrid  ClearCr… <NA>      2017  2013     NA
+    ##  16 s18GX0083_8   s14TZ000… <NA>  unassign… ClearCr… <NA>      2017  2013     NA
+    ##  17 s18GX0089_2   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  18 s18GX0093_3   s15JS020… <NA>  unassign… UO       <NA>      2017  2014     NA
+    ##  19 s18GX0095_1   <NA>      s15J… F1Hybrid  <NA>     ClearCr…  2017    NA   2014
+    ##  20 s18GX0097_6   s14TZ000… <NA>  F1Hybrid  ClearCr… <NA>      2017  2013     NA
+    ##  21 s18GX0114_5   s13QW000… <NA>  ClearCre… F1Hybrid <NA>      2017  2012     NA
+    ##  22 s18GX0122_4   s14TZ000… <NA>  F1Hybrid  ClearCr… <NA>      2017  2013     NA
+    ##  23 s18GX0123_7   <NA>      s14T… ClearCre… <NA>     ClearCr…  2017    NA   2013
+    ##  24 s18GX0133_7   a17RK2082 <NA>  ClearCre… ClearCr… <NA>      2017    NA     NA
+    ##  25 s18GX0138_2   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  26 s18GX0141_2   <NA>      s14T… ClearCre… <NA>     ClearCr…  2017    NA   2013
+    ##  27 s18GX0145_6   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  28 s18GX0146_3   <NA>      s15J… F1Hybrid  <NA>     ClearCr…  2017    NA   2014
+    ##  29 s18GX0148_2   s14TZ000… <NA>  ClearCre… ClearCr… <NA>      2017  2013     NA
+    ##  30 s18GX0151_4   s15JS000… <NA>  UO        unassig… <NA>      2017  2014     NA
+    ##  31 s18GX0153_3   s13QW000… <NA>  ClearCre… ClearCr… <NA>      2017  2012     NA
+    ##  32 s18GX0154_4   a17RK3793 <NA>  ClearCre… ClearCr… <NA>      2017    NA     NA
+    ##  33 s18GX0157_1   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  34 s18GX0158_3   <NA>      a17R… ClearCre… <NA>     ClearCr…  2017    NA     NA
+    ##  35 s18GX0160_5   <NA>      s15J… unassign… <NA>     ClearCr…  2017    NA   2014
+    ##  36 s18GX0161_1   s15JS001… <NA>  UO        UO       <NA>      2017  2014     NA
+    ##  37 s18GX0163_2   <NA>      a17R… ClearCre… <NA>     ClearCr…  2017    NA     NA
+    ##  38 s18GX0163_4   <NA>      a17R… ClearCre… <NA>     ClearCr…  2017    NA     NA
+    ##  39 s18GX0167_9   s15JS002… <NA>  UO        UO       <NA>      2017  2014     NA
+    ##  40 s18GX0170_7   <NA>      s15J… UO        <NA>     F1Hybrid  2017    NA   2014
+    ##  41 s18GX0178_4   s15JS005… <NA>  UO        UO       <NA>      2017  2014     NA
+    ##  42 s18GX0181_8   s14TZ000… <NA>  UO        UO       <NA>      2017  2013     NA
+    ##  43 s18GX0185_7   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  44 s18GX0186_1   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  45 s18GX0190_1   <NA>      s15J… F1Hybrid  <NA>     UO        2017    NA   2014
+    ##  46 s18GX0192_5   <NA>      a17R… ClearCre… <NA>     ClearCr…  2017    NA     NA
+    ##  47 s18GX0193_3   s14TZ000… <NA>  UO        UO       <NA>      2017  2013     NA
+    ##  48 s18GX0196_9   s15JS003… <NA>  UO        unassig… <NA>      2017  2014     NA
+    ##  49 s18GX0199_9   s15JS004… <NA>  UO        UO       <NA>      2017  2014     NA
+    ##  50 s18GX0203_6   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  51 s18GX0206_1   <NA>      s15J… F1Hybrid  <NA>     ClearCr…  2017    NA   2014
+    ##  52 s18GX0207_2   <NA>      a17R… ClearCre… <NA>     ClearCr…  2017    NA     NA
+    ##  53 s18GX0208_4   <NA>      s15J… F1Hybrid  <NA>     ClearCr…  2017    NA   2014
+    ##  54 s18GX0217_2   s15JS020… <NA>  UO        UO       <NA>      2017  2014     NA
+    ##  55 s18GX0217_5   <NA>      s15J… unassign… <NA>     UO        2017    NA   2014
+    ##  56 s18GX0217_8   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  57 s18GX0228_8   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  58 s18GX0231_1   <NA>      s14T… UO        <NA>     UO        2017    NA   2013
+    ##  59 s18GX0235_7   s15JS000… s15J… UO        unassig… UO        2017  2014   2014
+    ##  60 s18GX0239_5   s15JS000… <NA>  UO        unassig… <NA>      2017  2014     NA
+    ##  61 s18GX0240_6   s15JS020… <NA>  UO        UO       <NA>      2017  2014     NA
+    ##  62 s18GX0241_4   <NA>      s15J… UO        <NA>     unassig…  2017    NA   2014
+    ##  63 s18GX0243_3   s15JS003… <NA>  UO        unassig… <NA>      2017  2014     NA
+    ##  64 s18GX0243_4   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  65 s18GX0244_1   <NA>      s14T… UO        <NA>     UO        2017    NA   2013
+    ##  66 s18GX0246_2   s15JS000… s15J… UO        unassig… UO        2017  2014   2014
+    ##  67 s18GX0247_3   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  68 s18GX0247_4   <NA>      s14T… UO        <NA>     UO        2017    NA   2013
+    ##  69 s18GX0248_1   s15JS000… <NA>  unassign… unassig… <NA>      2017  2014     NA
+    ##  70 s18GX0254_8   s15JS020… <NA>  UO        UO       <NA>      2017  2014     NA
+    ##  71 s18GX0261_2   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  72 s18GX0275_7   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  73 s18GX0276_7   s14TZ000… <NA>  UO        UO       <NA>      2017  2013     NA
+    ##  74 s18GX0277_4   <NA>      a17R… ClearCre… <NA>     ClearCr…  2017    NA     NA
+    ##  75 s18GX0278_2   s15JS000… <NA>  unassign… F1Hybrid <NA>      2017  2014     NA
+    ##  76 s18GX0283_1   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  77 s18GX0283_7   s15JS001… <NA>  UO        UO       <NA>      2017  2014     NA
+    ##  78 s18GX0283_8   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  79 s18GX0285_2   s15JS003… <NA>  F1Hybrid  UO       <NA>      2017  2014     NA
+    ##  80 s18GX0288_7   s15JS004… <NA>  UO        UO       <NA>      2017  2014     NA
+    ##  81 s18GX0291_8   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  82 s18GX0294_4   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  83 s18GX0298_1   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  84 s18GX0298_5   s15JS003… <NA>  UO        UO       <NA>      2017  2014     NA
+    ##  85 s18GX0299_3   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  86 s18GX0305_6   <NA>      s15J… UO        <NA>     ClearCr…  2017    NA   2014
+    ##  87 s18GX0307_1   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  88 s18GX0308_3   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  89 s18GX0309_6   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  90 s18GX0309_7   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  91 s18GX0310_4   <NA>      s15J… UO        <NA>     UO        2017    NA   2014
+    ##  92 s19DY0103     <NA>      s15J… UO        <NA>     UO        2018    NA   2014
+    ##  93 s19DY0182     a18QN3058 <NA>  unassign… ClearCr… <NA>      2018    NA     NA
+    ##  94 s19DY0211     <NA>      s15J… UO        <NA>     unassig…  2018    NA   2014
+    ##  95 s19DY0232     <NA>      a19Q… ClearCre… <NA>     ClearCr…  2018    NA     NA
+    ##  96 s19DY0274     s13QW001… <NA>  UO        UO       <NA>      2018  2012     NA
+    ##  97 s19DY0304     a18QN3745 <NA>  ClearCre… ClearCr… <NA>      2018    NA     NA
+    ##  98 s19DY0366     s15JS001… <NA>  UO        F1Hybrid <NA>      2018  2014     NA
+    ##  99 s19DY0390     <NA>      a18Q… ClearCre… <NA>     ClearCr…  2018    NA     NA
+    ## 100 s19DY0472     a18QN3745 <NA>  ClearCre… ClearCr… <NA>      2018    NA     NA
+    ## 101 s19DY0494     s15JS000… <NA>  F1Hybrid  UO       <NA>      2018  2014     NA
+    ## 102 s19DY0506     s15JS000… <NA>  UO        unassig… <NA>      2018  2014     NA
+    ## 103 s19DY0651     <NA>      s15J… UO        <NA>     F1Hybrid  2018    NA   2014
+    ## 104 s19DY0704     s15JS001… <NA>  UO        UO       <NA>      2018  2014     NA
+    ## 105 s19DY0769     s15JS000… <NA>  UO        unassig… <NA>      2018  2014     NA
+    ## 106 s19DY0781     s15JS001… <NA>  UO        F1Hybrid <NA>      2018  2014     NA
+    ## 107 s19DY0784     <NA>      s15J… UO        <NA>     F1Hybrid  2018    NA   2014
+    ## 108 s19DY0793     <NA>      s15J… UO        <NA>     unassig…  2018    NA   2014
+    ## 109 s19DY0840     a18QN2710 <NA>  ClearCre… ClearCr… <NA>      2018    NA     NA
+    ## 110 s19DY0870     s15JS001… <NA>  UO        UO       <NA>      2018  2014     NA
+    ## 111 s19DY0871     <NA>      s15J… UO        <NA>     UO        2018    NA   2014
+    ## 112 s19DY0883     s15JS001… <NA>  UO        F1Hybrid <NA>      2018  2014     NA
+    ## 113 s19DY0929     s15JS001… <NA>  UO        F1Hybrid <NA>      2018  2014     NA
+    ## 114 s19DY0970     <NA>      s15J… UO        <NA>     unassig…  2018    NA   2014
+    ## 115 s19DY0979     s15JS001… <NA>  UO        F1Hybrid <NA>      2018  2014     NA
+    ## 116 s19DY1012     s15JS003… <NA>  UO        unassig… <NA>      2018  2014     NA
+    ## 117 s19DY1015     s15JS005… <NA>  F1Hybrid  UO       <NA>      2018  2014     NA
+    ## 118 s19DY1028     s15JS001… <NA>  UO        UO       <NA>      2018  2014     NA
+    ## 119 s19DY1029     <NA>      s15J… UO        <NA>     UO        2018    NA   2014
+    ## 120 s19DY1030     <NA>      s15J… UO        <NA>     unassig…  2018    NA   2014
+    ## 121 s19DY1061     s14TZ000… <NA>  ClearCre… ClearCr… <NA>      2018  2013     NA
+    ## 122 s19DY1065     <NA>      a18Q… unassign… <NA>     ClearCr…  2018    NA     NA
+    ## 123 s19DY1069     <NA>      s15J… UO        <NA>     ClearCr…  2018    NA   2014
+    ## 124 s19DY1077     s15JS006… <NA>  UO        UO       <NA>      2018  2014     NA
+    ## 125 s19DY1102     <NA>      s15J… UO        <NA>     ClearCr…  2018    NA   2014
+    ## 126 s19DY1134     s15JS003… <NA>  UO        unassig… <NA>      2018  2014     NA
+    ## 127 s19DY1151     s15JS001… <NA>  UO        UO       <NA>      2018  2014     NA
+    ## 128 s19DY1170     <NA>      s15J… UO        <NA>     ClearCr…  2018    NA   2014
+    ## 129 s19DY1175     s15JS001… <NA>  UO        UO       <NA>      2018  2014     NA
+    ## 130 s19DY1190     s15JS001… <NA>  UO        UO       <NA>      2018  2014     NA
+    ## 131 s19DY1212     <NA>      s15J… UO        <NA>     ClearCr…  2018    NA   2014
+    ## 132 s19DY1221     <NA>      s15J… UO        <NA>     UO        2018    NA   2014
+    ## 133 s19DY1222     s13QW000… <NA>  UO        unassig… <NA>      2018  2012     NA
+    ## 134 s19DY1238     <NA>      s15J… UO        <NA>     UO        2018    NA   2014
+    ## 135 s19DY1293     s15JS003… <NA>  UO        ClearCr… <NA>      2018  2014     NA
+    ## 136 s19DY1299     <NA>      s15J… UO        <NA>     UO        2018    NA   2014
+    ## 137 s19DY1304     <NA>      s15J… UO        <NA>     ClearCr…  2018    NA   2014
+    ## 138 s19DY1333     <NA>      s15J… UO        <NA>     UO        2018    NA   2014
+    ## 139 s19DY1339     s15JS003… <NA>  UO        UO       <NA>      2018  2014     NA
+    ## 140 s19DY1344     <NA>      s15J… UO        <NA>     ClearCr…  2018    NA   2014
+    ## 141 s19DY1351     s15JS006… <NA>  UO        UO       <NA>      2018  2014     NA
+    ## 142 s19DY1357     <NA>      s15J… UO        <NA>     ClearCr…  2018    NA   2014
+    ## 143 s19DY1391     <NA>      s15J… UO        <NA>     UO        2018    NA   2014
+    ## 144 s19DY1409     s15JS006… <NA>  UO        UO       <NA>      2018  2014     NA
+    ## 145 s19DY1410     s14TZ000… <NA>  unassign… unassig… <NA>      2018  2013     NA
+    ## 146 s19DY1413     <NA>      s15J… UO        <NA>     ClearCr…  2018    NA   2014
+    ## 147 s19DY1434     <NA>      s15J… UO        <NA>     UO        2018    NA   2014
+    ## 148 s19DY1462     <NA>      s15J… UO        <NA>     UO        2018    NA   2014
+    ## 149 s19DY1470     <NA>      s14T… UO        <NA>     unassig…  2018    NA   2013
+    ## 150 s19DY1497     s15JS004… <NA>  UO        UO       <NA>      2018  2014     NA
+    ## 151 s20LV0012     <NA>      a19Q… ClearCre… <NA>     ClearCr…  2019    NA     NA
+    ## 152 s20LV0419     <NA>      s15J… unassign… <NA>     F1Hybrid  2019    NA   2014
+    ## 153 s20LV0456     <NA>      s14T… ClearCre… <NA>     ClearCr…  2019    NA   2013
+    ## 154 s20LV0517     s18GX015… <NA>  ClearCre… ClearCr… <NA>      2019  2017     NA
+    ## 155 s20LV0679     <NA>      s15J… unassign… <NA>     UO        2019    NA   2014
+    ## 156 s20LV0783     a19QX2196 <NA>  ClearCre… ClearCr… <NA>      2019    NA     NA
+    ## 157 s20LV0945     <NA>      s14T… UO        <NA>     UO        2019    NA   2013
+    ## 158 s20LV1084     a19QX2196 <NA>  ClearCre… ClearCr… <NA>      2019    NA     NA
+    ## 159 s20LV1190     s15JS002… <NA>  UO        unassig… <NA>      2019  2014     NA
+    ## 160 s20LV1204     s18GX014… <NA>  ClearCre… ClearCr… <NA>      2019  2017     NA
+    ## 161 s20LV1261     s15JS006… <NA>  UO        UO       <NA>      2019  2014     NA
+    ## 162 s20LV1328     <NA>      a19Q… ClearCre… <NA>     ClearCr…  2019    NA     NA
+    ## 163 s20LV1350     a19QX2196 <NA>  ClearCre… ClearCr… <NA>      2019    NA     NA
+    ## 164 s20LV1357     s15JS006… <NA>  UO        UO       <NA>      2019  2014     NA
+    ## 165 s20LV1453     <NA>      s14T… UO        <NA>     UO        2019    NA   2013
+    ## 166 s20LV1710     <NA>      s14T… UO        <NA>     UO        2019    NA   2013
+    ## 167 s20LV1753     <NA>      s18G… UO        <NA>     UO        2019    NA   2017
+    ## 168 s20LV1765     s18GX008… <NA>  UO        UO       <NA>      2019  2017     NA
+    ## 169 s20LV1785     s18GX011… <NA>  ClearCre… UO       <NA>      2019  2017     NA
+    ## 170 s20LV1906     s18GX010… <NA>  UO        UO       <NA>      2019  2017     NA
+    ## 171 s20LV2062     s18GX017… <NA>  UO        UO       <NA>      2019  2017     NA
+    ## 172 s20LV2123     <NA>      s18G… unassign… <NA>     UO        2019    NA   2017
+    ## 173 s20LV2327     <NA>      s15J… UO        <NA>     UO        2019    NA   2014
+
+Lets look at NEWHYBRIDS assignments of all parents.
 
 ``` r
 table(par1par$maternal)
@@ -1463,6 +1469,10 @@ table(par1par$paternal)
     ## ClearCreek   F1Hybrid unassigned         UO 
     ##         32          4          6         50
 
+Lets look at NEWHYBRIDS assignments of all maternal PO pairs. The
+maternal assignment is by column and their offspring’s assignment is by
+row.
+
 ``` r
 table(par1par$offspring, par1par$maternal)
 ```
@@ -1473,6 +1483,9 @@ table(par1par$offspring, par1par$maternal)
     ##   F1Hybrid            3        0          0  3
     ##   unassigned          2        1          2  1
     ##   UO                  1        5         13 31
+
+NEWHYBRIDS assignments of paternal PO pairs. The paternal assignment is
+by column and their offspring’s assignment is by row.
 
 ``` r
 table(par1par$offspring, par1par$paternal)
@@ -1485,6 +1498,9 @@ table(par1par$offspring, par1par$paternal)
     ##   unassigned          2        1          0  3
     ##   UO                  9        3          6 46
 
+Lets see what the inferred/assumed age distribution of juvenile parents
+looks like.
+
 ``` r
 par1par <- 
   mutate(par1par, BYid_BYdam=BYid-BYdam, BYid_BYsire=BYid-BYsire)
@@ -1496,11 +1512,15 @@ page <-
     frequency=c(table(par1par$BYid_BYdam)/sum(table(par1par$BYid_BYdam)), table(par1par$BYid_BYsire)/sum(table(par1par$BYid_BYsire))), 
     sex=c(rep("female", 5), rep("male", 5)))
 
-ggplot(page, mapping=aes(x=age, y=frequency, fill=sex)) + 
-  geom_col(position="dodge")
+ggplot(page, mapping=aes(x=age, y=count, fill=sex)) + 
+  geom_col(position="dodge") + 
+  labs(title="Inferred age structure of juvenile parents assuming no yearling LH")
 ```
 
-![](p75matrix_files/figure-gfm/unnamed-chunk-12-2.png)<!-- -->
+![](p75matrix_files/figure-gfm/unnamed-chunk-34-1.png)<!-- -->
+
+Lets look at parentage assignments where the mother or father are
+adults.
 
 ``` r
 filter(
@@ -1508,37 +1528,96 @@ filter(
   grepl(pattern="^a", id) | 
     grepl(pattern="^a", dam) | 
     grepl(pattern="^a", sire)) |> 
-  select(-MEpair, -BYdam, -BYid_BYdam, -BYid_BYsire) %>% 
+  select(-BYdam, -BYsire, -BYid_BYdam, -BYid_BYsire) %>% 
   print(n=nrow(.))
 ```
 
-    ## # A tibble: 27 × 10
-    ##    id          dam   sire  OHdam OHsire offspring maternal paternal  BYid BYsire
-    ##    <chr>       <chr> <chr> <int>  <int> <chr>     <chr>    <chr>    <int>  <int>
-    ##  1 s18GX0054_3 <NA>  a17R…    NA      0 ClearCre… <NA>     ClearCr…  2017     NA
-    ##  2 s18GX0060_4 <NA>  a17R…    NA      0 ClearCre… <NA>     ClearCr…  2017     NA
-    ##  3 s18GX0067_5 a17R… <NA>      0     NA ClearCre… ClearCr… <NA>      2017     NA
-    ##  4 s18GX0067_8 a17R… <NA>      0     NA ClearCre… ClearCr… <NA>      2017     NA
-    ##  5 s18GX0068_5 a17R… <NA>      0     NA ClearCre… ClearCr… <NA>      2017     NA
-    ##  6 s18GX0075_7 a17R… <NA>      0     NA ClearCre… ClearCr… <NA>      2017     NA
-    ##  7 s18GX0078_7 a17R… <NA>      0     NA ClearCre… ClearCr… <NA>      2017     NA
-    ##  8 s18GX0133_7 a17R… <NA>      0     NA ClearCre… ClearCr… <NA>      2017     NA
-    ##  9 s18GX0154_4 a17R… <NA>      0     NA ClearCre… ClearCr… <NA>      2017     NA
-    ## 10 s18GX0158_3 <NA>  a17R…    NA      0 ClearCre… <NA>     ClearCr…  2017     NA
-    ## 11 s18GX0163_2 <NA>  a17R…    NA      0 ClearCre… <NA>     ClearCr…  2017     NA
-    ## 12 s18GX0163_4 <NA>  a17R…    NA      0 ClearCre… <NA>     ClearCr…  2017     NA
-    ## 13 s18GX0192_5 <NA>  a17R…    NA      0 ClearCre… <NA>     ClearCr…  2017     NA
-    ## 14 s18GX0207_2 <NA>  a17R…    NA      0 ClearCre… <NA>     ClearCr…  2017     NA
-    ## 15 s18GX0277_4 <NA>  a17R…    NA      0 ClearCre… <NA>     ClearCr…  2017     NA
-    ## 16 s19DY0182   a18Q… <NA>      0     NA unassign… ClearCr… <NA>      2018     NA
-    ## 17 s19DY0232   <NA>  a19Q…    NA      0 ClearCre… <NA>     ClearCr…  2018     NA
-    ## 18 s19DY0304   a18Q… <NA>      0     NA ClearCre… ClearCr… <NA>      2018     NA
-    ## 19 s19DY0390   <NA>  a18Q…    NA      0 ClearCre… <NA>     ClearCr…  2018     NA
-    ## 20 s19DY0472   a18Q… <NA>      0     NA ClearCre… ClearCr… <NA>      2018     NA
-    ## 21 s19DY0840   a18Q… <NA>      0     NA ClearCre… ClearCr… <NA>      2018     NA
-    ## 22 s19DY1065   <NA>  a18Q…    NA      0 unassign… <NA>     ClearCr…  2018     NA
-    ## 23 s20LV0012   <NA>  a19Q…    NA      0 ClearCre… <NA>     ClearCr…  2019     NA
-    ## 24 s20LV0783   a19Q… <NA>      0     NA ClearCre… ClearCr… <NA>      2019     NA
-    ## 25 s20LV1084   a19Q… <NA>      0     NA ClearCre… ClearCr… <NA>      2019     NA
-    ## 26 s20LV1328   <NA>  a19Q…    NA      0 ClearCre… <NA>     ClearCr…  2019     NA
-    ## 27 s20LV1350   a19Q… <NA>      0     NA ClearCre… ClearCr… <NA>      2019     NA
+    ## # A tibble: 27 × 7
+    ##    id          dam       sire      offspring  maternal   paternal    BYid
+    ##    <chr>       <chr>     <chr>     <chr>      <chr>      <chr>      <int>
+    ##  1 s18GX0054_3 <NA>      a17RK2386 ClearCreek <NA>       ClearCreek  2017
+    ##  2 s18GX0060_4 <NA>      a17RK2386 ClearCreek <NA>       ClearCreek  2017
+    ##  3 s18GX0067_5 a17RK3793 <NA>      ClearCreek ClearCreek <NA>        2017
+    ##  4 s18GX0067_8 a17RK2671 <NA>      ClearCreek ClearCreek <NA>        2017
+    ##  5 s18GX0068_5 a17RK3793 <NA>      ClearCreek ClearCreek <NA>        2017
+    ##  6 s18GX0075_7 a17RK3793 <NA>      ClearCreek ClearCreek <NA>        2017
+    ##  7 s18GX0078_7 a17RK3793 <NA>      ClearCreek ClearCreek <NA>        2017
+    ##  8 s18GX0133_7 a17RK2082 <NA>      ClearCreek ClearCreek <NA>        2017
+    ##  9 s18GX0154_4 a17RK3793 <NA>      ClearCreek ClearCreek <NA>        2017
+    ## 10 s18GX0158_3 <NA>      a17RK3106 ClearCreek <NA>       ClearCreek  2017
+    ## 11 s18GX0163_2 <NA>      a17RK3038 ClearCreek <NA>       ClearCreek  2017
+    ## 12 s18GX0163_4 <NA>      a17RK3106 ClearCreek <NA>       ClearCreek  2017
+    ## 13 s18GX0192_5 <NA>      a17RK2020 ClearCreek <NA>       ClearCreek  2017
+    ## 14 s18GX0207_2 <NA>      a17RK2020 ClearCreek <NA>       ClearCreek  2017
+    ## 15 s18GX0277_4 <NA>      a17RK2020 ClearCreek <NA>       ClearCreek  2017
+    ## 16 s19DY0182   a18QN3058 <NA>      unassigned ClearCreek <NA>        2018
+    ## 17 s19DY0232   <NA>      a19QX2725 ClearCreek <NA>       ClearCreek  2018
+    ## 18 s19DY0304   a18QN3745 <NA>      ClearCreek ClearCreek <NA>        2018
+    ## 19 s19DY0390   <NA>      a18QN3757 ClearCreek <NA>       ClearCreek  2018
+    ## 20 s19DY0472   a18QN3745 <NA>      ClearCreek ClearCreek <NA>        2018
+    ## 21 s19DY0840   a18QN2710 <NA>      ClearCreek ClearCreek <NA>        2018
+    ## 22 s19DY1065   <NA>      a18QN3757 unassigned <NA>       ClearCreek  2018
+    ## 23 s20LV0012   <NA>      a19QX3667 ClearCreek <NA>       ClearCreek  2019
+    ## 24 s20LV0783   a19QX2196 <NA>      ClearCreek ClearCreek <NA>        2019
+    ## 25 s20LV1084   a19QX2196 <NA>      ClearCreek ClearCreek <NA>        2019
+    ## 26 s20LV1328   <NA>      a19QX3667 ClearCreek <NA>       ClearCreek  2019
+    ## 27 s20LV1350   a19QX2196 <NA>      ClearCreek ClearCreek <NA>        2019
+
+The results above are mostly sensible. Row 17 does not make sense,
+because an adult transported to the spawning grounds in fall of 2019
+cannot possibly sire offspring sampled in spring of 2019.
+
+Lets look at female tabs.
+
+``` r
+filter(
+  par1par, 
+  grepl(pattern="^a", id) | 
+    grepl(pattern="^a", dam) | 
+    grepl(pattern="^a", sire)) |> 
+  group_by(dam) |> 
+  count() |> 
+  ungroup() |> 
+  filter(!is.na(dam)) %>% 
+  print(n=nrow(.))
+```
+
+    ## # A tibble: 7 × 2
+    ##   dam           n
+    ##   <chr>     <int>
+    ## 1 a17RK2082     1
+    ## 2 a17RK2671     1
+    ## 3 a17RK3793     5
+    ## 4 a18QN2710     1
+    ## 5 a18QN3058     1
+    ## 6 a18QN3745     2
+    ## 7 a19QX2196     3
+
+Male tabs.
+
+``` r
+filter(
+  par1par, 
+  grepl(pattern="^a", id) | 
+    grepl(pattern="^a", dam) | 
+    grepl(pattern="^a", sire)) |> 
+  group_by(sire) |> 
+  count() |> 
+  ungroup() |> 
+  filter(!is.na(sire)) %>% 
+  print(n=nrow(.))
+```
+
+    ## # A tibble: 7 × 2
+    ##   sire          n
+    ##   <chr>     <int>
+    ## 1 a17RK2020     3
+    ## 2 a17RK2386     2
+    ## 3 a17RK3038     1
+    ## 4 a17RK3106     2
+    ## 5 a18QN3757     2
+    ## 6 a19QX2725     1
+    ## 7 a19QX3667     2
+
+I would have expected higher variance in the number of offspring of
+adult males.

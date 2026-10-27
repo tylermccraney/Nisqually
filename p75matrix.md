@@ -2,7 +2,12 @@ Exploratory data filtering and parentage analysis of 95 adult and 9,008
 juvenile Nisqually River Chinook salmon
 ================
 
-Load package libraries and set working directory.
+This is an exploratory analysis based on DFW’s data filtering criteria,
+plus a few more filters. The ML parentage analysis uses `sequoia()`.
+This is an unusual parentage analysis because of the many juveniles and
+relatively few adults.
+
+First we load package libraries and set our working directory.
 
 ``` r
 library(readxl)
@@ -804,12 +809,12 @@ par1 <-
     ## 
     ##  Time    |  R |  Step      |  Progress  | Dams  | Sires |  GPs  |   Total LL 
     ## -------- | -- | ---------- | ---------- | ----- | ----- | ----- | ----------
-    ## 15:42:02 |  0 | count OH   |            | 
-    ## 15:42:02 |  0 | initial    |            |     0 |     0 |     0 |  -505624.0 
-    ## 15:42:02 |  1 | parents    | .......... |    81 |    91 |     0 |  -504261.2 
-    ## 15:42:16 |  2 | parents    | .......... |    83 |    92 |     0 |  -504256.0 
-    ## 15:42:30 |  3 | parents    | .......... |    83 |    92 |     0 |  -504256.0 
-    ## 15:42:43 | 99 | est byears | .......... |
+    ## 16:01:37 |  0 | count OH   |            | 
+    ## 16:01:37 |  0 | initial    |            |     0 |     0 |     0 |  -505624.0 
+    ## 16:01:37 |  1 | parents    | .......... |    81 |    91 |     0 |  -504261.2 
+    ## 16:01:51 |  2 | parents    | .......... |    83 |    92 |     0 |  -504256.0 
+    ## 16:02:04 |  3 | parents    | .......... |    83 |    92 |     0 |  -504256.0 
+    ## 16:02:18 | 99 | est byears | .......... |
 
     ## ✔ assigned 83 dams and 92 sires to 8831 individuals
 

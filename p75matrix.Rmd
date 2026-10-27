@@ -7,7 +7,9 @@ output: github_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-Load package libraries and set working directory.
+This is an exploratory analysis based on DFW's data filtering criteria, plus a few more filters. The ML parentage analysis uses `sequoia()`. This is an unusual parentage analysis because of the many juveniles and relatively few adults.  
+
+First we load package libraries and set our working directory. 
 
 ```{r}
 library(readxl)

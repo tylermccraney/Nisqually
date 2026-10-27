@@ -69,8 +69,7 @@ lh <-
   mutate(BirthYear=str_extract(BirthYear, "^\\d{2}") |> as.integer())
 
 lh$BirthYear[1:9008] <- 
-  lh$BirthYear[1:9008] + 
-  1999
+  lh$BirthYear[1:9008] + 1999
 
 lh$BirthYear[9009:9103] <- 
   NA
@@ -82,15 +81,11 @@ table(lh$BirthYear, lh$Sex, useNA="ifany")
 
 lh$BY.min[9009:9103] <- 
   str_extract(string=lh$ID[9009:9103], pattern="^\\d{2}") |> 
-  as.numeric() + 
-  2000 - 
-  6
+  as.numeric() + 2000 - 6
 
 lh$BY.max[9009:9103] <- 
   str_extract(string=lh$ID[9009:9103], pattern="^\\d{2}") |> 
-  as.numeric() + 
-  2000 - 
-  2
+  as.numeric() + 2000 - 2
 
 
 lh$Sex <- 
@@ -203,7 +198,7 @@ ggplot(data=gt, mapping=aes(x=perc)) +
 
 ```
 
-### filter individuals with ≥ 30% missing SNPs
+### filter individuals with ≤ 30% missing SNPs
 
 ```{r}
 gt <- 
@@ -223,7 +218,7 @@ hets <-
   rowSums(gm$Mrecode==1, na.rm=TRUE) / 
   (rowSums(gm$Mrecode==0, na.rm=TRUE) + rowSums(gm$Mrecode==2, na.rm=TRUE))
 
-min(hets) ### OK
+round(min(hets)*100, 1) # No filtering needed
 
 snpstats <- 
   SnpStats(gm$Mrecode, Plot=FALSE)
@@ -248,17 +243,15 @@ as.data.frame(snpstats) |>
   labs(x="HWE p-value")
 ```
 
-### filter SNPs with ≥ 90% calls, HWE.p ≥ 0.05/n, and Minor Allele Frequency ≥ 5%
+### filter SNPs with ≥ 90% calls, HWE.p ≥ 0.05/n, and Minor Allele Frequency ≥ 1%
 
 ```{r}
-
-p90af95 <-
+p90af99 <-
   as.data.frame(snpstats) |> rownames_to_column("ID") %>%
-  filter(HWE.p>=0.05/nrow(.)) |>
-  filter(Mis<=0.1, AF<=0.95) |> 
+  filter(Mis<=0.1, HWE.p>=0.05/nrow(.), AF<=0.99) |>
   as_tibble()
 
-p90af95 %>% 
+p90af99 %>% 
   print(n=nrow(.))
 
 ```
@@ -269,7 +262,7 @@ gm75 <-
   snp.recode(
     M=as.matrix(
       column_to_rownames(
-        select(gt[-300], c("ID", str_remove(string=p90af95$ID, pattern="[A-Z_0]{4}$"))), 
+        select(gt[-300], c("ID", str_remove(string=p90af99$ID, pattern="[A-Z_0]{4}$"))), 
         var="ID")), 
     recoding="ATGCto012")
 
@@ -301,7 +294,7 @@ gm75c <-
       column_to_rownames(
         select(
           gt[-300], 
-          c("ID", str_remove(string=p90af95$ID, pattern="[A-Z_0]{4}$"))) |> filter(!ID %in% pull(dup1cut, ID)), 
+          c("ID", str_remove(string=p90af99$ID, pattern="[A-Z_0]{4}$"))) |> filter(!ID %in% pull(dup1cut, ID)), 
         var="ID")), 
     recoding="ATGCto012")
 
@@ -310,8 +303,6 @@ lhc <-
 
 gm75c <- 
   CheckGeno(gm75c$Mrecode)
-
-dim(gm75c)
 
 dim(lhc)
 
@@ -330,8 +321,12 @@ dup2cut <-
     filter(gt, ID %in% dup2$DupGenotype$ID1) |> select(ID1=ID, perc1=perc), 
     filter(gt, ID %in% dup2$DupGenotype$ID2) |> select(ID2=ID, perc2=perc)) %>% 
   mutate(ID=if_else(condition=perc1<=perc2, true=ID2, false=ID1))
+```
 
 ### estimate parentage
+
+```{r}
+
 par1 <- 
   sequoia(
     GenoM=gm75c[rownames(gm75c)[!rownames(gm75c) %in% dup2cut$ID], ], 
@@ -410,9 +405,16 @@ table(par1par$offspring, par1par$paternal)
 par1par <- 
   mutate(par1par, BYid_BYdam=BYid-BYdam, BYid_BYsire=BYid-BYsire)
 
-table(par1par$BYid_BYdam)
+page <- 
+  tibble(
+    age=c(table(par1par$BYid_BYdam) |> names() |> as.numeric(), table(par1par$BYid_BYsire) |> names() |> as.numeric()), 
+    count=c(table(par1par$BYid_BYdam), table(par1par$BYid_BYsire)), 
+    frequency=c(table(par1par$BYid_BYdam)/sum(table(par1par$BYid_BYdam)), table(par1par$BYid_BYsire)/sum(table(par1par$BYid_BYsire))), 
+    sex=c(rep("female", 5), rep("male", 5)))
 
-table(par1par$BYid_BYsire)
+ggplot(page, mapping=aes(x=age, y=frequency, fill=sex)) + 
+  geom_col(position="dodge")
+
 
 filter(
   par1par, 

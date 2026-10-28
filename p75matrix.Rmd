@@ -123,7 +123,7 @@ lh$BY.max <-
 tail(lh)
 
 ```
-DFW filters individuals with IFI scores greater than 2.5. Lets see what that looks like.
+DFW filters individuals with IFI scores less than 2.5. Lets see what that looks like.
 
 ```{r}
 mutate(dat, IFI=as.double(IFI)) |> 
@@ -133,7 +133,7 @@ mutate(dat, IFI=as.double(IFI)) |>
 
 ```
 
-Lets go ahead and filter individuals with IFI scores greater than 2.5.
+Lets go ahead and filter individuals with IFI scores less than 2.5.
 
 ```{r}
 gt <- 
@@ -255,7 +255,7 @@ hets <-
 round(min(hets)*100, 1) 
 ```
 
-No heterozygosity filtering needed.  
+The minimum is 12% heterozygous genotypes, so filtering needed.  
 
 DFW filters SNPs with less than 10% missing genotypes. Lets see what that looks like.  
 
@@ -283,7 +283,7 @@ as.data.frame(snpstats) |>
   labs(x="HWE p-value")
 ```
 
-Lets filter SNPs with ≥ 90% genotypes and HWE.p ≥ 0.05/n. DFW doesn't filter SNPs based on Minor Allele Frequency (MAF), but I'm going to remove SNPs with MAF < 1%, because these SNPs are unlikely to be informative for parentage analysis. Ideally, we would filter SNPs with MAF ≥ 30%, so that Parent-Offspring (PO) pairs can be evaluated with Opposing Homozygosity (OH) at a sufficient number of SNPs.  
+Lets filter SNPs with ≥ 90% genotypes and HWE.p ≥ 0.05/n. DFW doesn't filter SNPs based on Minor Allele Frequency (MAF), but I'm going to remove SNPs with MAF < 1%, because these SNPs are unlikely to be informative for parentage analysis. Ideally, we would filter SNPs with MAF ≥ 30% since Parent-Offspring (PO) pairs are evaluated with Opposing Homozygosity (OH).  
 
 ```{r}
 p90af99 <-
@@ -292,7 +292,7 @@ p90af99 <-
   as_tibble()
 ```
 
-A total of 180 SNPs remain after filtering. Most of these SNPs will be uninformative for parentage analysis because they have low MAFs (only 64 SNPs with MAF ≥ 30%, which is recommended MAF filtering for parentage with `sequoia()`).
+A total of 180 SNPs remain after filtering. Most of these SNPs are uninformative for parentage analysis because they have low MAFs (only 64 SNPs with MAF ≥ 30%, which is recommended MAF filtering for parentage with `sequoia()`).
 
 ```{r}
 p90af99 %>% 
@@ -364,7 +364,7 @@ dup2cut <-
   mutate(ID=if_else(condition=perc1<=perc2, true=ID2, false=ID1))
 ```
 
-Okay, now we're ready to infer parentage. We include min=2 and max=6 age constraints for parents (the default would be min=1 and max=9).
+Okay, now we're ready to infer parentage. We include min (2) and max (6) age constraints for parents (the default would be 1 and 9).
 
 ```{r}
 par1 <- 
@@ -387,7 +387,7 @@ filter(par1$PedigreePar, !is.na(dam) | !is.na(sire)) |>
 
 ```
 
-Now lets take a look at parentage through the lens of sexual selection, which predicts that males would exhibit higher variance in reproductive success than females.  
+Now lets take a look at parentage through the lens of sexual selection, which predicts that males would have higher variance in reproductive success than females.  
 
 ```{r}
 tibble(
@@ -412,7 +412,7 @@ male <-
 rbind(female=round(female, 1), male=round(male, 1))
 ```
 
-As would be expected under the theory of sexual selection, the male variance in reproductive success is more than twice that of the female. One male had 13 offspring!  
+As would be expected under the theory of sexual selection, the male has higher variance in reproductive success. One male had 13 offspring!  
 
 Now lets take a look at the NEWHYBRIDS assignments of PO pairs.  
 

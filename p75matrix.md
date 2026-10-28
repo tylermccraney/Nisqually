@@ -182,7 +182,7 @@ tail(lh)
     ## 5 adult        17RK3142     2        NA   2011   2015
     ## 6 adult        18QN2612     1        NA   2012   2016
 
-DFW filters individuals with IFI scores greater than 2.5. Lets see what
+DFW filters individuals with IFI scores less than 2.5. Lets see what
 that looks like.
 
 ``` r
@@ -199,7 +199,7 @@ mutate(dat, IFI=as.double(IFI)) |>
 
 ![](p75matrix_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
 
-Lets go ahead and filter individuals with IFI scores greater than 2.5.
+Lets go ahead and filter individuals with IFI scores less than 2.5.
 
 ``` r
 gt <- 
@@ -347,7 +347,7 @@ round(min(hets)*100, 1)
 
     ## [1] 12.1
 
-No heterozygosity filtering needed.
+The minimum is 12% heterozygous genotypes, so filtering needed.
 
 DFW filters SNPs with less than 10% missing genotypes. Lets see what
 that looks like.
@@ -394,8 +394,8 @@ Lets filter SNPs with ≥ 90% genotypes and HWE.p ≥ 0.05/n. DFW doesn’t
 filter SNPs based on Minor Allele Frequency (MAF), but I’m going to
 remove SNPs with MAF \< 1%, because these SNPs are unlikely to be
 informative for parentage analysis. Ideally, we would filter SNPs with
-MAF ≥ 30%, so that Parent-Offspring (PO) pairs can be evaluated with
-Opposing Homozygosity (OH) at a sufficient number of SNPs.
+MAF ≥ 30% since Parent-Offspring (PO) pairs are evaluated with Opposing
+Homozygosity (OH).
 
 ``` r
 p90af99 <-
@@ -404,7 +404,7 @@ p90af99 <-
   as_tibble()
 ```
 
-A total of 180 SNPs remain after filtering. Most of these SNPs will be
+A total of 180 SNPs remain after filtering. Most of these SNPs are
 uninformative for parentage analysis because they have low MAFs (only 64
 SNPs with MAF ≥ 30%, which is recommended MAF filtering for parentage
 with `sequoia()`).
@@ -760,8 +760,8 @@ dup2cut <-
   mutate(ID=if_else(condition=perc1<=perc2, true=ID2, false=ID1))
 ```
 
-Okay, now we’re ready to infer parentage. We include min=2 and max=6 age
-constraints for parents (the default would be min=1 and max=9).
+Okay, now we’re ready to infer parentage. We include min (2) and max (6)
+age constraints for parents (the default would be 1 and 9).
 
 ``` r
 par1 <- 
@@ -809,12 +809,12 @@ par1 <-
     ## 
     ##  Time    |  R |  Step      |  Progress  | Dams  | Sires |  GPs  |   Total LL 
     ## -------- | -- | ---------- | ---------- | ----- | ----- | ----- | ----------
-    ## 16:01:37 |  0 | count OH   |            | 
-    ## 16:01:37 |  0 | initial    |            |     0 |     0 |     0 |  -505624.0 
-    ## 16:01:37 |  1 | parents    | .......... |    81 |    91 |     0 |  -504261.2 
-    ## 16:01:51 |  2 | parents    | .......... |    83 |    92 |     0 |  -504256.0 
-    ## 16:02:04 |  3 | parents    | .......... |    83 |    92 |     0 |  -504256.0 
-    ## 16:02:18 | 99 | est byears | .......... |
+    ## 07:15:46 |  0 | count OH   |            | 
+    ## 07:15:46 |  0 | initial    |            |     0 |     0 |     0 |  -505624.0 
+    ## 07:15:46 |  1 | parents    | .......... |    81 |    91 |     0 |  -504261.2 
+    ## 07:16:00 |  2 | parents    | .......... |    83 |    92 |     0 |  -504256.0 
+    ## 07:16:14 |  3 | parents    | .......... |    83 |    92 |     0 |  -504256.0 
+    ## 07:16:27 | 99 | est byears | .......... |
 
     ## ✔ assigned 83 dams and 92 sires to 8831 individuals
 
@@ -1014,7 +1014,7 @@ filter(par1$PedigreePar, !is.na(dam) | !is.na(sire)) |>
     ## 173 s20LV2327     <NA>          s15JS0042_012    NA      1     NA
 
 Now lets take a look at parentage through the lens of sexual selection,
-which predicts that males would exhibit higher variance in reproductive
+which predicts that males would have higher variance in reproductive
 success than females.
 
 ``` r
@@ -1048,9 +1048,8 @@ rbind(female=round(female, 1), male=round(male, 1))
     ## female  1.6      1.6
     ## male    1.6      3.6
 
-As would be expected under the theory of sexual selection, the male
-variance in reproductive success is more than twice that of the female.
-One male had 13 offspring!
+As would be expected under the theory of sexual selection, the male has
+higher variance in reproductive success. One male had 13 offspring!
 
 Now lets take a look at the NEWHYBRIDS assignments of PO pairs.
 

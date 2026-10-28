@@ -5,7 +5,7 @@ juvenile Nisqually River Chinook salmon
 This is an exploratory analysis based on DFW’s data filtering criteria,
 plus a few more filters. The ML parentage analysis uses `sequoia()`.
 This is an unusual parentage analysis because of the many juveniles and
-relatively few adults.
+few adults.
 
 First we load package libraries and set our working directory.
 
@@ -341,13 +341,17 @@ gm <-
 hets <- 
   rowSums(gm$Mrecode==1, na.rm=TRUE) / 
   (rowSums(gm$Mrecode==0, na.rm=TRUE) + rowSums(gm$Mrecode==2, na.rm=TRUE))
+```
 
+``` r
 round(min(hets)*100, 1) 
 ```
 
     ## [1] 12.1
 
-The minimum is 12% heterozygous genotypes, so filtering needed.
+``` r
+# The minimum heterozygous genotypes observed is 12.1%, so no filtering is needed.
+```
 
 DFW filters SNPs with less than 10% missing genotypes. Lets see what
 that looks like.
@@ -366,7 +370,7 @@ as.data.frame(snpstats) |>
 
     ## `stat_bin()` using `bins = 30`. Pick better value `binwidth`.
 
-![](p75matrix_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
+![](p75matrix_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
 
 DFW doesn’t do any filtering based on conformance to Hardy-Weinberg
 Equilibrium (HWE). I think severe violations of HWE are a good
@@ -388,7 +392,7 @@ as.data.frame(snpstats) |>
     ## Warning: Removed 15 rows containing non-finite outside the scale range
     ## (`stat_bin()`).
 
-![](p75matrix_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
+![](p75matrix_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
 
 Lets filter SNPs with ≥ 90% genotypes and HWE.p ≥ 0.05/n. DFW doesn’t
 filter SNPs based on Minor Allele Frequency (MAF), but I’m going to
@@ -809,12 +813,12 @@ par1 <-
     ## 
     ##  Time    |  R |  Step      |  Progress  | Dams  | Sires |  GPs  |   Total LL 
     ## -------- | -- | ---------- | ---------- | ----- | ----- | ----- | ----------
-    ## 07:15:46 |  0 | count OH   |            | 
-    ## 07:15:46 |  0 | initial    |            |     0 |     0 |     0 |  -505624.0 
-    ## 07:15:46 |  1 | parents    | .......... |    81 |    91 |     0 |  -504261.2 
-    ## 07:16:00 |  2 | parents    | .......... |    83 |    92 |     0 |  -504256.0 
-    ## 07:16:14 |  3 | parents    | .......... |    83 |    92 |     0 |  -504256.0 
-    ## 07:16:27 | 99 | est byears | .......... |
+    ## 09:18:04 |  0 | count OH   |            | 
+    ## 09:18:04 |  0 | initial    |            |     0 |     0 |     0 |  -505624.0 
+    ## 09:18:04 |  1 | parents    | .......... |    81 |    91 |     0 |  -504261.2 
+    ## 09:18:18 |  2 | parents    | .......... |    83 |    92 |     0 |  -504256.0 
+    ## 09:18:31 |  3 | parents    | .......... |    83 |    92 |     0 |  -504256.0 
+    ## 09:18:45 | 99 | est byears | .......... |
 
     ## ✔ assigned 83 dams and 92 sires to 8831 individuals
 
@@ -1023,12 +1027,12 @@ tibble(
   sex=c(rep("female", table(par1$PedigreePar$dam) |> length()), rep("male", table(par1$PedigreePar$sire) |> length()))) |> 
   ggplot(aes(x=x, fill=sex)) + 
   geom_histogram(position="dodge") + 
-  labs(x="number of offspring", title="Do males exhibit higher variance in reproductive success?")
+  labs(x="number of offspring", title="Do males have higher variance in reproductive success?")
 ```
 
     ## `stat_bin()` using `bins = 30`. Pick better value `binwidth`.
 
-![](p75matrix_files/figure-gfm/unnamed-chunk-26-1.png)<!-- -->
+![](p75matrix_files/figure-gfm/unnamed-chunk-27-1.png)<!-- -->
 
 Lets crunch the numbers and see…
 
@@ -1048,8 +1052,10 @@ rbind(female=round(female, 1), male=round(male, 1))
     ## female  1.6      1.6
     ## male    1.6      3.6
 
-As would be expected under the theory of sexual selection, the male has
-higher variance in reproductive success. One male had 13 offspring!
+``` r
+# As expected under sexual selection theory, males have higher variance in
+# reproductive success. One male had 13 offspring!  
+```
 
 Now lets take a look at the NEWHYBRIDS assignments of PO pairs.
 
@@ -1488,6 +1494,13 @@ table(par1par$offspring, par1par$maternal)
     ##   unassigned          2        1          2  1
     ##   UO                  1        5         13 31
 
+``` r
+# This makes sense. Most offspring have the same NEWHYBRIDS assignment as
+# their inferred maternal parent. Also, F1Hybrids don't beget F1Hybrids,
+# and we don't see that in the NEWHYBRIDS assignment of inferred PO pairs,
+# so that's affirming.
+```
+
 NEWHYBRIDS assignments of paternal PO pairs. The paternal assignment is
 by column and their offspring’s assignment is by row.
 
@@ -1501,6 +1514,18 @@ table(par1par$offspring, par1par$paternal)
     ##   F1Hybrid            5        0          0  1
     ##   unassigned          2        1          0  3
     ##   UO                  9        3          6 46
+
+``` r
+# This mostly makes sense. It's interesting to see how many UO offspring 
+# (n=9 presumably local Nisqually origin) are sired by fathers assigned 
+# to ClearCreek hatchery. Another observation that's interesting here and
+# in the maternal results above is how F1Hybrid parents appear to backcross
+# only with UO spawners, and not ClearCreek (as inferred from NEWHYBRIDS
+# assignment of offspring). This observation leads to some fascinating
+# questions in ecology and evolutionary biology, but our sample sizes are
+# very small and we're playing fast-and-loose with the assumptions we've
+# made to produce this result.  
+```
 
 Lets see what the inferred/assumed age distribution of juvenile parents
 looks like.
@@ -1521,7 +1546,7 @@ ggplot(page, mapping=aes(x=age, y=count, fill=sex)) +
   labs(title="Inferred age structure of juvenile parents assuming no yearling LH")
 ```
 
-![](p75matrix_files/figure-gfm/unnamed-chunk-34-1.png)<!-- -->
+![](p75matrix_files/figure-gfm/unnamed-chunk-35-1.png)<!-- -->
 
 Lets look at parentage assignments where the mother or father are
 adults.
@@ -1567,9 +1592,11 @@ filter(
     ## 26 s20LV1328   <NA>      a19QX3667 ClearCreek <NA>       ClearCreek  2019
     ## 27 s20LV1350   a19QX2196 <NA>      ClearCreek ClearCreek <NA>        2019
 
-The results above are mostly sensible. Row 17 does not make sense,
-because an adult transported to the spawning grounds in fall of 2019
-cannot possibly sire offspring sampled in spring of 2019.
+``` r
+# The results above are mostly sensible. Row 17 does not make sense, because
+# an adult transported to the spawning grounds in fall of 2019 cannot possibly
+# sire offspring sampled in spring of 2019. 
+```
 
 Lets look at female tabs.
 
@@ -1622,6 +1649,3 @@ filter(
     ## 5 a18QN3757     2
     ## 6 a19QX2725     1
     ## 7 a19QX3667     2
-
-I would have expected higher variance in the number of offspring of
-adult males.

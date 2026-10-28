@@ -7,7 +7,7 @@ output: github_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-This is an exploratory analysis based on DFW's data filtering criteria, plus a few more filters. The ML parentage analysis uses `sequoia()`. This is an unusual parentage analysis because of the many juveniles and relatively few adults.  
+This is an exploratory analysis based on DFW's data filtering criteria, plus a few more filters. The ML parentage analysis uses `sequoia()`. This is an unusual parentage analysis because of the many juveniles and few adults.  
 
 First we load package libraries and set our working directory. 
 
@@ -251,11 +251,14 @@ gm <-
 hets <- 
   rowSums(gm$Mrecode==1, na.rm=TRUE) / 
   (rowSums(gm$Mrecode==0, na.rm=TRUE) + rowSums(gm$Mrecode==2, na.rm=TRUE))
-
-round(min(hets)*100, 1) 
 ```
 
-The minimum is 12% heterozygous genotypes, so filtering needed.  
+
+```{r}
+round(min(hets)*100, 1) 
+
+# The minimum heterozygous genotypes observed is 12.1%, so no filtering is needed.
+```
 
 DFW filters SNPs with less than 10% missing genotypes. Lets see what that looks like.  
 
@@ -395,7 +398,7 @@ tibble(
   sex=c(rep("female", table(par1$PedigreePar$dam) |> length()), rep("male", table(par1$PedigreePar$sire) |> length()))) |> 
   ggplot(aes(x=x, fill=sex)) + 
   geom_histogram(position="dodge") + 
-  labs(x="number of offspring", title="Do males exhibit higher variance in reproductive success?")
+  labs(x="number of offspring", title="Do males have higher variance in reproductive success?")
 ```
 
 Lets crunch the numbers and see...
@@ -410,9 +413,10 @@ male <-
     variance=table(par1$PedigreePar$sire) |> var())
 
 rbind(female=round(female, 1), male=round(male, 1))
-```
 
-As would be expected under the theory of sexual selection, the male has higher variance in reproductive success. One male had 13 offspring!  
+# As expected under sexual selection theory, males have higher variance in
+# reproductive success. One male had 13 offspring!  
+```
 
 Now lets take a look at the NEWHYBRIDS assignments of PO pairs.  
 
@@ -465,17 +469,20 @@ par1par %>%
 Lets look at NEWHYBRIDS assignments of all parents. 
 
 ```{r}
-
 table(par1par$maternal)
 
 table(par1par$paternal)
-
 ```
 
 Lets look at NEWHYBRIDS assignments of all maternal PO pairs. The maternal assignment is by column and their offspring's assignment is by row.
 
 ```{r}
 table(par1par$offspring, par1par$maternal)
+
+# This makes sense. Most offspring have the same NEWHYBRIDS assignment as
+# their inferred maternal parent. Also, F1Hybrids don't beget F1Hybrids,
+# and we don't see that in the NEWHYBRIDS assignment of inferred PO pairs,
+# so that's affirming.
 ```
 
 NEWHYBRIDS assignments of paternal PO pairs. The paternal assignment is by column and their offspring's assignment is by row.
@@ -483,6 +490,15 @@ NEWHYBRIDS assignments of paternal PO pairs. The paternal assignment is by colum
 ```{r}
 table(par1par$offspring, par1par$paternal)
 
+# This mostly makes sense. It's interesting to see how many UO offspring 
+# (n=9 presumably local Nisqually origin) are sired by fathers assigned 
+# to ClearCreek hatchery. Another observation that's interesting here and
+# in the maternal results above is how F1Hybrid parents appear to backcross
+# only with UO spawners, and not ClearCreek (as inferred from NEWHYBRIDS
+# assignment of offspring). This observation leads to some fascinating
+# questions in ecology and evolutionary biology, but our sample sizes are
+# very small and we're playing fast-and-loose with the assumptions we've
+# made to produce this result.  
 ```
 
 Lets see what the inferred/assumed age distribution of juvenile parents looks like.
@@ -515,9 +531,10 @@ filter(
   select(-BYdam, -BYsire, -BYid_BYdam, -BYid_BYsire) %>% 
   print(n=nrow(.))
 
+# The results above are mostly sensible. Row 17 does not make sense, because
+# an adult transported to the spawning grounds in fall of 2019 cannot possibly
+# sire offspring sampled in spring of 2019. 
 ```
-
-The results above are mostly sensible. Row 17 does not make sense, because an adult transported to the spawning grounds in fall of 2019 cannot possibly sire offspring sampled in spring of 2019. 
 
 Lets look at female tabs.  
 
@@ -549,4 +566,4 @@ filter(
   print(n=nrow(.))
 ```
 
-I would have expected higher variance in the number of offspring of adult males.  
+  

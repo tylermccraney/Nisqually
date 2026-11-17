@@ -94,6 +94,7 @@ dat <-
     life_history, 
     ploidy,
     sex=sex_id,
+    locus_count=count,
     27:358) |>
   mutate(ifi=as.numeric(ifi))
 
@@ -286,20 +287,583 @@ dat_bio <-
 dat_bio <- 
   mutate(
     dat_bio, 
-    sample_datetime_date=as.numeric(sample_datetime) |> as.Date(origin="1899-12-30"),
-    date_date=as.numeric(date) |> as.Date(origin="1899-12-30"),
-    delivery_date_date=as.numeric(delivery_date) |> as.Date(origin="1899-12-30"),
-    trucked_date_date=as.numeric(trucked_date) |> as.Date(origin="1899-12-30"),
-    j_t_rec_date_date=as.numeric(j_t_rec_date) |> as.Date(origin="1899-12-30"))
+    sample_datetime=as.numeric(sample_datetime) |> as.Date(origin="1899-12-30"),
+    date=as.numeric(date) |> as.Date(origin="1899-12-30"),
+    delivery_date=as.numeric(delivery_date) |> as.Date(origin="1899-12-30"),
+    trucked_date=as.numeric(trucked_date) |> as.Date(origin="1899-12-30"),
+    j_t_rec_date=as.numeric(j_t_rec_date) |> as.Date(origin="1899-12-30"))
+
+dat_bio <- 
+  relocate(
+    dat_bio, sample_datetime, date, delivery_date, trucked_date, j_t_rec_date, 
+    yearjtcolor_code, sampling_year, week_number, time, day_month, 
+    .before=year)
+
+dat_bio <- 
+  relocate(
+    dat_bio, 
+    wdfw_id, match, code, nit_gen_sample_id_code, other_useful_information, nit_sample_name, dna_number, genetic_label, genetic_sample, comment, wdfw_genetic_sample_code_id, gs_number, gs_status, gs_comment, 
+    scale_sample_, gilbert_rich, age, life_stage, length, length_cm_,
+    .after=management_week)
+
+dat_bio <- 
+  relocate(
+    dat_bio,
+    sex, sex_1, sex_2, sex_id, 
+    .after=fork_length_cm)
+
+dat_bio <- 
+  relocate(
+    dat_bio,
+    ad_clip, cwt, source_hatchery, hatchery_or_natural, origin, 
+    .after=mark_types)
+
+dat_bio <- 
+  mutate(
+    dat_bio, 
+    sample_date=if_else(!is.na(sample_datetime), true=sample_datetime, false=date),
+    sample_date=if_else(is.na(sample_date), true=trucked_date, false=sample_date),
+    sample_date=if_else(is.na(sample_date), true=j_t_rec_date, false=sample_date), 
+    sample_year=if_else(!is.na(sample_date), true=year(sample_date), false=as.double(year))) |>
+  relocate(sample_year, sample_date, .before=sample_datetime) |>
+  select(-sample_datetime, -date, -year, -sampling_year, -week_number, -time, -code, )
 
 
+dat_bio <- 
+  mutate(
+    dat_bio, 
+    sample_year=if_else(
+      condition=is.na(sample_year), 
+      true=as.double(str_extract(wdfw_id, "^\\d{2}"))+2000, 
+      false=sample_year))
+
+dat_bio <-
+  filter(dat_bio, !is.na(sample_year)) |>
+  arrange(sample_year, sample_date)
+
+dat_bio <-
+  filter(dat_bio, !gs_status %in% "ambiguous source")
+
+dat_bio <-
+  mutate(
+    dat_bio, 
+    dna_number=as.numeric(dna_number), 
+    genetic_sample=as.numeric(genetic_sample), 
+    gs_number=as.numeric(gs_number), 
+    jaw_tag_number=as.numeric(jaw_tag_number), 
+    length_cm=as.numeric(length), 
+    fork_length_cm=as.numeric(fork_length_cm), 
+    length_cm_=as.numeric(length_cm_))
+
+dat_bio <-
+  select(dat_bio, -day_month, -management_week, -spcode, -species, -speciesquantity)
+
+dat_bio <-
+  mutate(
+    dat_bio, 
+    length_cm=if_else(condition=is.na(length_cm), true=fork_length_cm, false=length_cm), 
+    length_cm=if_else(condition=is.na(length_cm), true=length_cm_, false=length_cm)) |>
+  relocate(length_cm, .before=length) |>
+  select(-fork_length_cm, -length_cm_)
+
+
+table(dat_bio$sex, useNA="ifany")
+
+dat_bio$sex <- 
+  replace_values(
+    dat_bio$sex, 
+    c("1 Male", "Jack", "Male") ~ "M", 
+    c("2 Female", "Female") ~ "F", 
+    "Unknown" ~ NA)
+
+table(dat_bio$sex_1, useNA="ifany")
+
+dat_bio$sex_1 <- 
+  replace_values(
+    dat_bio$sex_1, 
+    "1" ~ "M", 
+    "2" ~ "F")
+
+table(dat_bio$sex_id, useNA="ifany")
+
+dat_bio$sex_id <- 
+  replace_values(
+    dat_bio$sex_id, 
+    "no data" ~ NA)
+
+table(dat_bio$sex_type_description, useNA="ifany")
+
+dat_bio$sex_type_description <- 
+  replace_values(
+    dat_bio$sex_type_description, 
+    "Unknown" ~ NA)
+
+
+
+dat_bio <-
+  mutate(
+    dat_bio, 
+    sex=if_else(condition=is.na(sex), true=sex_1, false=sex), 
+    sex=if_else(condition=is.na(sex), true=sex_2, false=sex), 
+    sex=if_else(condition=is.na(sex), true=sex_id, false=sex), 
+    sex=if_else(condition=is.na(sex), true=sex_type_description, false=sex)) |>
+  select(-sex_1, -sex_2, -sex_id)
+
+
+table(dat_bio$sex, useNA="ifany")
+
+dat_bio$sex <- 
+  replace_values(
+    dat_bio$sex, 
+    c("Male", "Precocious Male") ~ "M", 
+    c("Female") ~ "F")
+
+
+table(dat_bio$mark_types, useNA="ifany")
+
+dat_bio$mark_types <- 
+  replace_values(
+    dat_bio$mark_types, 
+    c("Ad Mark", "Adipose Clip, Unknown Coded Wire Tag") ~ "Adipose Clip",
+    c("Adipose Clip, Coded Wire Tag") ~ "Adipose Clip, CWT",
+    "No Adipose Clip, Coded Wire Tag" ~ "CWT",
+    c("Unknown", "Unknown Adipose Clip", "Unknown Adipose Clip, Unknown Coded Wire Tag") ~ NA)
+
+
+table(dat_bio$ad_clip, useNA="ifany")
+
+dat_bio$ad_clip <- 
+  replace_values(
+    dat_bio$ad_clip, 
+    c("Clip Or CWT", "Marked (fin clip)", "Yes") ~ "TRUE",
+    c("No", "Unmarked (no fin clip)") ~ "FALSE",
+    c("unknown", "Unknown") ~ NA) |> 
+  as.logical()
+
+
+table(dat_bio$cwt, useNA="ifany")
+
+dat_bio$cwt <- 
+  replace_values(
+    dat_bio$cwt, 
+    c("Clip Or CWT", "CWT", "Yes") ~ "TRUE",
+    c("No", "No CWT") ~ "FALSE",
+    c("Unknown", "Unknown/No Head") ~ NA) |> 
+  as.logical()
+
+
+table(dat_bio$source_hatchery, useNA="ifany")
+
+dat_bio$source_hatchery <- 
+  replace_values(
+    dat_bio$source_hatchery, 
+    c("Unknown") ~ NA)
+
+
+table(dat_bio$hatchery_or_natural, useNA="ifany")
+
+table(dat_bio$origin, useNA="ifany")
+
+dat_bio$origin <- 
+  replace_values(
+    dat_bio$origin, 
+    "H" ~ "Hatchery", 
+    c("?", "U", "Unknown") ~ NA)
+
+
+dat_bio <- 
+  mutate(
+    dat_bio, 
+    ad_clip=if_else(mark_types %in% c("Adipose Clip", "Adipose Clip, CWT"), true=TRUE, false=ad_clip),
+    cwt=if_else(mark_types %in% c("Adipose Clip, CWT", "CWT"), true=TRUE, false=cwt))
+
+dat_bio <- 
+  mutate(
+    dat_bio, 
+    origin=if_else(is.na(origin), true=hatchery_or_natural, false=origin),
+    origin=if_else(source_hatchery %in% "Clear Creek Hatchery", true="Hatchery", false=origin)) |>
+  select(-hatchery_or_natural)
+
+# 2012
+weir2012 <- 
+  filter(dat_bio, spreadsheet=="genetics sample numbers checking v2$weir.xlsx", sample_year==2012) |>
+  arrange(genetic_sample)
+
+table(dat$green_db_collection_name)
+
+weir2012$wdfw_id <- 
+  filter(dat, green_db_collection_name=="2012 Nisqually Weir Chinook") |> 
+  pull(id)
+
+sgs2012 <- 
+  filter(dat_bio, spreadsheet=="genetics sample numbers checking v2$spawning ground.xlsx", sample_year==2012) |>
+  arrange(gs_number)
+
+sgs2012$wdfw_id <- 
+  filter(dat, green_db_collection_name=="2012 Nisqually Spawning Grounds Chinook") |> 
+  pull(id)
+
+
+# 2013
+#######################################################################################################
+# incomplete
+#######################################################################################################
+weir2013 <- 
+  filter(dat_bio, spreadsheet=="genetics sample numbers checking v2$weir.xlsx", sample_year==2013) |>
+  arrange(genetic_sample)
+
+# weir2013$wdfw_id <-
+filter(dat, green_db_collection_name=="2013  Nisqually Weir Chinook") |>
+  pull(id)
+
+#######################################################################################################
+# incomplete
+#######################################################################################################
+
+sgs2013 <- 
+  filter(dat_bio, spreadsheet=="genetics sample numbers checking v2$spawning ground.xlsx", sample_year==2013) |>
+  arrange(gs_number, comment)
+
+
+sgs2013$wdfw_id[1:44] <- 
+  filter(dat, green_db_collection_name=="2013 Nisqually Spawning Ground Survey Chinook") |> 
+  pull(id)
+
+sgs2013$comment <-
+  gsub(pattern="13IL4", replacement="13IL004", sgs2013$comment) |> 
+  gsub(pattern="13l00038", replacement="13IL0038")
+
+sgs2013 <- 
+  mutate(sgs2013, wdfw_id=if_else(is.na(wdfw_id), true=comment, false=wdfw_id))
+
+# 2014
+#######################################################################################################
+# incomplete
+#######################################################################################################
+weir2014 <- 
+  filter(dat_bio, spreadsheet=="genetics sample numbers checking v2$weir.xlsx", sample_year==2014) |>
+  arrange(genetic_sample, sample_date)
+
+# weir2014$genetic_sample[139:144] <- 
+#   c(51, 73, 95, 173, 51, 73)
+  
+# weir2014$wdfw_id <-
+filter(dat, green_db_collection_name=="2014 Nisqually Weir Chinook") |>
+  pull(id)
+
+#######################################################################################################
+# incomplete
+#######################################################################################################
+
+# 2015
+# no bio data
+filter(dat, grepl(pattern="^15", id)) |> 
+  select(1:2) %>% 
+  print(n=nrow(.))
+
+
+# 2016
+# no genotypes or bio data
+filter(dat, grepl(pattern="^16", id)) |> 
+  select(1:2) %>% 
+  print(n=nrow(.))
+
+
+# 2017
+a2017 <- 
+  filter(dat_bio, sample_year==2017) |>
+  arrange(nit_gen_sample_id_code)
+
+a2017$nit_gen_sample_id_code[1714] <- "3800"
+
+a2017$nit_gen_sample_id_code[c(1:17, 48:1942)] <-
+  paste0("GEN-HRY->SG '17 # ", a2017$nit_gen_sample_id_code[c(1:17, 48:1942)])
+
+a2017 <- 
+  mutate(
+    a2017, 
+    nit_gen_sample_id_code=if_else(
+      condition=is.na(nit_gen_sample_id_code), 
+      true=wdfw_genetic_sample_code_id, 
+      false=nit_gen_sample_id_code))
+
+
+d2017 <- 
+  filter(dat, grepl(pattern="^17", id)) |> 
+  select(1:2)
+
+
+a2017$nit_gen_sample_id_code <- 
+  gsub(pattern="11KS75", replacement="11KS 75", a2017$nit_gen_sample_id_code) |>
+  gsub(pattern="14mm 76", replacement="14MM 76") |>
+  gsub(pattern="24MM 78", replacement="14MM 78")
+
+
+
+a2017 <- 
+  left_join(x=a2017[-8], y=rename(d2017, wdfw_id=id), by=join_by(nit_gen_sample_id_code==alt_id)) |> 
+  relocate(wdfw_id, .before=match)
+
+
+a2017$nit_gen_sample_id_code[18:45]
+
+a2017$wdfw_id[18:45] <-
+  d2017$id[87:114]
+
+anti_join(x=d2017, y=a2017, by=join_by(id==wdfw_id)) %>% 
+  print(n=nrow(.))
+
+
+
+# 2018
+a2018 <- 
+  filter(dat_bio, sample_year==2018) |> 
+  # mutate(nit_gen_sample_id_code=as.numeric(nit_gen_sample_id_code)) |>
+  arrange(wdfw_id, nit_gen_sample_id_code)
+
+
+d2018 <- 
+  filter(dat, grepl(pattern="^18", id)) |> 
+  select(1:2, 5, 7)
+
+
+# 2019
+a2019 <- 
+  filter(dat_bio, sample_year==2019)
+
+d2019 <- 
+  filter(dat, grepl(pattern="^19", id)) |> 
+  select(1:2)
+
+a2019 <- 
+  mutate(
+    a2019, 
+    nit_gen_sample_id_code=if_else(
+      condition=is.na(nit_gen_sample_id_code), 
+      true=wdfw_genetic_sample_code_id, 
+      false=nit_gen_sample_id_code))
+
+
+table(a2019$wdfw_genetic_sample_code_id)
+
+anti_join(x=d2019, y=a2019, by=join_by(alt_id==nit_gen_sample_id_code)) %>% 
+  print(n=nrow(.))
+
+a2019$nit_gen_sample_id_code <-
+  gsub(pattern="GEN_SpnGnd_19- ", replacement="GEN_SpnGnd_19-", a2019$nit_gen_sample_id_code) |>
+  gsub(pattern="MASH100219", replacement="MASH 100219")
+
+
+a2019$nit_gen_sample_id_code[3263:3267]
+a2019$wdfw_id[3263:3267] <-
+  c("19QU0003", "19QU0004", "19QU0005", "19QU0006", "19QU0007")
+
+
+a2019$nit_gen_sample_id_code[3388:3399]
+a2019$wdfw_id[3388:3399] <-
+  c("19QU0008", "19QU0009", "19QU0010", "19QU0011", "19QU0012", "19QU0013", 
+    "19QU0014", "19QU0015", "19QU0016", "19QU0017", "19QU0018", "19QU0019")
+
+
+a2019$nit_gen_sample_id_code[3400]
+a2019$wdfw_id[3400] <- 
+  "19QU0001"
+
+
+a2019$nit_gen_sample_id_code[3401:3402]
+a2019$wdfw_id[3401:3402] <- 
+  c("19QU0025", "19QU0026")
+
+
+
+a2019$nit_gen_sample_id_code[3146]
+a2019$wdfw_id[3146] <- 
+  "19QU0002"
+
+a2019$nit_gen_sample_id_code[3403:3407]
+a2019$wdfw_id[3403:3407] <- 
+  c("19QU0020", "19QU0021", "19QU0022", "19QU0023", "19QU0024")
+
+a2019$nit_gen_sample_id_code[3409]
+a2019$wdfw_id[3409] <- 
+  "19QU0027"
+
+
+a2019_na <- 
+  filter(a2019, is.na(wdfw_id))
+
+a2019_no <- 
+  filter(a2019, !is.na(wdfw_id))
+
+a2019_na <- 
+  left_join(x=a2019_na[-8], y=rename(d2019, wdfw_id=id), by=join_by(nit_gen_sample_id_code==alt_id)) |> 
+  relocate(wdfw_id, .before=match)
+
+a2019 <- 
+  bind_rows(a2019_na, a2019_no) |> 
+  arrange(wdfw_id)
+
+
+
+
+# 2021
+a2021 <- 
+  filter(dat_bio, sample_year==2021)
+
+d2021 <- 
+  filter(dat, grepl(pattern="^21", id)) |> 
+  select(1:2)
+
+
+"GEN_SG_21_1"
+"Gen_SG_21-1"
+
+a2021$genetic_label <-
+  gsub(pattern="GEN_SG_21_", replacement="Gen_SG_21-", a2021$genetic_label)
+
+a2021 <- 
+  left_join(x=a2021[-8], y=rename(d2021, wdfw_id=id), by=join_by(genetic_label==alt_id)) |> 
+  relocate(wdfw_id, .before=match)
+
+# 2022
+a2022 <- 
+  filter(dat_bio, sample_year==2022)
+
+d2022 <- 
+  filter(dat, grepl(pattern="^22", id)) |> 
+  select(1:2)
+
+a2022$genetic_label <- 
+  gsub(pattern=" ", replacement="", a2022$genetic_label)
+
+a2022 <- 
+  distinct(a2022, genetic_label, .keep_all=TRUE)
+
+a2022 <- 
+  left_join(x=a2022[-8], y=rename(d2022, wdfw_id=id), by=join_by(genetic_label==alt_id)) |> 
+  relocate(wdfw_id, .before=match)
+
+
+# 2023
+a2023 <- 
+  filter(dat_bio, sample_year==2023)
+
+d2023 <- 
+  filter(dat, grepl(pattern="^23", id)) |> 
+  select(1:2)
+
+a2023$genetic_label <- 
+  gsub(pattern=" ", replacement="", a2023$genetic_label) |>
+  gsub(pattern="CH.Gen.Trad2023", replacement="CH.Gten.Trad2023", fixed=TRUE)
+
+a2023 <- 
+  distinct(a2023, genetic_label, .keep_all=TRUE)
+
+"CH.Gten.Trad2023-8"
+'CH.Gen.Trad2023-8'
+
+a2023 <- 
+  left_join(x=a2023[-8], y=rename(d2023, wdfw_id=id), by=join_by(genetic_label==alt_id)) |> 
+  relocate(wdfw_id, .before=match)
+
+a2023$genetic_label[355]
+  
+a2023$wdfw_id[355] <- 
+  "23NF0052"
+
+a2023$genetic_label[382]
+
+a2023$wdfw_id[382] <- 
+  "23NF0056"
+
+
+
+# 2024
+# no bio data
+filter(dat, grepl(pattern="^24", id)) |> 
+  select(1:2)
+
+# 2025
+a2025 <- 
+  filter(dat_bio, sample_year==2025) |>
+  arrange(nit_sample_name)
+
+a2025$nit_sample_name <- 
+  gsub(pattern=" ", replacement="", a2025$nit_sample_name) |>
+  gsub(pattern="SpnGnd25", replacement="SpnGnd_25")
+
+d2025 <- 
+  filter(dat, grepl(pattern="^25", id)) |> 
+  select(1:2, 5, 7)
+
+a2025 <- 
+  left_join(
+    x=a2025[-8], 
+    y=select(d2025, wdfw_id=id, alt_id), 
+    by=join_by(nit_sample_name==alt_id)) |> 
+  relocate(wdfw_id, .before=match)
+
+anti_join(x=d2025, y=a2025, by=join_by(alt_id==nit_sample_name)) %>% 
+  print(n=nrow(.))
+
+
+a2025_na <- 
+  filter(a2025, is.na(wdfw_id))
+
+a2025_no <- 
+  filter(a2025, !is.na(wdfw_id))
+
+a2025_na_SpnGnd <- 
+  filter(a2025_na, grepl(pattern="SpnGnd", nit_sample_name))
+
+a2025_na_CIR <- 
+  filter(a2025_na, grepl(pattern="CIR", nit_sample_name)) |> 
+  arrange(dna_number)
+
+c("25UM0001", "25UM0002", "25UM0003", "25UM0005", "25UM0008", "25UM0012", "25UM0013", "25UM0014")
+
+a2025_na_Trad <- 
+  filter(a2025_na, grepl(pattern="Trad", nit_sample_name))
+
+
+
+
+
+bind_rows(a2025_na_CIR, a2025_na_SpnGnd, a2025_na_Trad)
+
+a2025_na <- 
+  left_join(x=a2025_na[-8] |> mutate(dna_number=as.character(dna_number)), y=rename(d2025, wdfw_id=id), by=join_by(dna_number==alt_id)) |> 
+  relocate(wdfw_id, .before=match)
+
+a2025 <- 
+  bind_rows(a2025_na, a2025_no) |> 
+  arrange(wdfw_id)
+
+"CH.Gen.CIR2025-33"
+"CH.Gen.SpnGnd25-1"
+
+
+
+
+
+
+
+
+
+
+
+filter(dat_bio, spreadsheet=="genetics sample numbers checking v2$weir.xlsx", sample_year==2013) |> view()
 names(dat_bio) |> sort()
+
+distinct(dat, alt_id)
 
 distinct(dat_bio, genetic_label)
 distinct(dat_bio, genetic_sample)
-distinct(dat_bio, genetic_label, nit_sample_name)
+distinct(dat_bio, nit_sample_name)
 
-distinct(dat_bio, genetic_label, nit_gen_sample_id_code, nit_sample_name, wdfw_id)
+distinct(dat_bio, genetic_label, genetic_sample, comment, nit_gen_sample_id_code, wdfw_genetic_sample_code_id, nit_sample_name) |> view()
+
+
 
 semi_join(
   x=distinct(dat, id, alt_id), 
@@ -308,7 +872,7 @@ semi_join(
   distinct(alt_id)
 
 
-
+dat
 
 # lookup1 <- 
 #   read_tsv(file="Green_DB_collection_name__origin.tsv")

@@ -302,7 +302,9 @@ dat_bio <-
 dat_bio <- 
   relocate(
     dat_bio, 
-    wdfw_id, match, code, nit_gen_sample_id_code, other_useful_information, nit_sample_name, dna_number, genetic_label, genetic_sample, comment, wdfw_genetic_sample_code_id, gs_number, gs_status, gs_comment, 
+    wdfw_id, match, code, nit_gen_sample_id_code, other_useful_information, 
+    nit_sample_name, dna_number, genetic_label, genetic_sample, comment, 
+    wdfw_genetic_sample_code_id, gs_number, gs_status, gs_comment, 
     scale_sample_, gilbert_rich, age, life_stage, length, length_cm_,
     .after=management_week)
 
@@ -369,6 +371,9 @@ dat_bio <-
 
 table(dat_bio$sex, useNA="ifany")
 
+dat_bio <-
+  mutate(dat_bio, lh=ifelse(test=sex=="Jack", yes="jack", no=NA))
+
 dat_bio$sex <- 
   replace_values(
     dat_bio$sex, 
@@ -398,6 +403,8 @@ dat_bio$sex_type_description <-
     dat_bio$sex_type_description, 
     "Unknown" ~ NA)
 
+dat_bio <-
+  mutate(dat_bio, lh=ifelse(test=sex_type_description=="Precocious Male", yes="jack", no=lh))
 
 
 dat_bio <-
@@ -416,7 +423,7 @@ dat_bio$sex <-
   replace_values(
     dat_bio$sex, 
     c("Male", "Precocious Male") ~ "M", 
-    c("Female") ~ "F")
+    "Female" ~ "F")
 
 
 table(dat_bio$mark_types, useNA="ifany")
@@ -425,7 +432,7 @@ dat_bio$mark_types <-
   replace_values(
     dat_bio$mark_types, 
     c("Ad Mark", "Adipose Clip, Unknown Coded Wire Tag") ~ "Adipose Clip",
-    c("Adipose Clip, Coded Wire Tag") ~ "Adipose Clip, CWT",
+    "Adipose Clip, Coded Wire Tag" ~ "Adipose Clip, CWT",
     "No Adipose Clip, Coded Wire Tag" ~ "CWT",
     c("Unknown", "Unknown Adipose Clip", "Unknown Adipose Clip, Unknown Coded Wire Tag") ~ NA)
 
@@ -510,11 +517,18 @@ sgs2012$wdfw_id <-
 #######################################################################################################
 weir2013 <- 
   filter(dat_bio, spreadsheet=="genetics sample numbers checking v2$weir.xlsx", sample_year==2013) |>
+  filter(genetic_sample!=2) |>
   arrange(genetic_sample)
 
-# weir2013$wdfw_id <-
-filter(dat, green_db_collection_name=="2013  Nisqually Weir Chinook") |>
-  pull(id)
+wd2013 <- 
+  filter(dat, green_db_collection_name=="2013  Nisqually Weir Chinook") |> 
+  select(1:2, 5, 7)
+
+weir2013$sex[c(1, 3:31)]
+wd2013$sex[1:30]
+
+wd2013 %>% 
+  print(n=nrow(.))
 
 #######################################################################################################
 # incomplete
@@ -542,14 +556,45 @@ sgs2013 <-
 #######################################################################################################
 weir2014 <- 
   filter(dat_bio, spreadsheet=="genetics sample numbers checking v2$weir.xlsx", sample_year==2014) |>
+  # filter(!release_condition %in% c("5 No Signs Of Life (Dead)", "Not Released")) |>
+  # filter(!is.na(genetic_sample)) |>
+  # filter(!is.na(jaw_tag_number)) |>
+  # filter(grepl(pattern="^y", gs_status)) |>
   arrange(genetic_sample, sample_date)
 
-# weir2014$genetic_sample[139:144] <- 
-#   c(51, 73, 95, 173, 51, 73)
-  
+weir2014$comment[138:144]
+
+weir2014$genetic_sample[138:144] <-
+  c(388:389, 391, 394, 390, 392:393)
+
+weir2014 <- 
+  arrange(weir2014, genetic_sample)
+
+
+weir2014 <- 
+  slice(weir2014, -15, -31, -40, -46, -138, -140, -144)
+
+table(weir2014$release_condition, weir2014$release_action, useNA="ifany")
+table(weir2014$release_condition, useNA="ifany")
+
+# weir2014$scale_sample_ <- 
+#   factor(weir2014$scale_sample_, levels=c("1-1", "1-2", "1-3", "1-4", "1-5", "1-6", "1-7", "1-8", "1-9", "1-10", "1-11", "1-12", "2-1", "2-2", "2-3", "2-4", "2-5", "2-6", "3-1", "3-2", "3-3", "3-4", "3-5", "3-6", "3-7", "3-8", "4-1", "4-2", "4-3", "4-4", "4-5", "4-6", "5-1", "5-2", "6-1", "6-2", "6-3", "6-4", "6-5", "6-6", "6-7", "6-8", "6-9", "6-10", "6-11", "9-1", "9-2", "9-3"), ordered=TRUE)
+
+# weir2014 <- 
+#   arrange(weir2014, sample_date, jaw_tag_number, genetic_sample)
+
+weir2014$sex[1:20]
+filter(dat, green_db_collection_name=="2014 Nisqually Weir Chinook")$sex[1:20]
+
+
 # weir2014$wdfw_id <-
-filter(dat, green_db_collection_name=="2014 Nisqually Weir Chinook") |>
-  pull(id)
+wd2014 <- 
+  filter(dat, green_db_collection_name=="2014 Nisqually Weir Chinook") |> 
+  select(1:2, 5, 7)
+
+wd2014 %>% 
+  print(n=nrow(.))
+
 
 #######################################################################################################
 # incomplete
@@ -626,6 +671,8 @@ d2018 <-
   filter(dat, grepl(pattern="^18", id)) |> 
   select(1:2, 5, 7)
 
+d2018 %>% 
+  print(n=nrow(.))
 
 # 2019
 a2019 <- 
@@ -715,15 +762,14 @@ d2021 <-
   select(1:2)
 
 
-"GEN_SG_21_1"
-"Gen_SG_21-1"
-
 a2021$genetic_label <-
   gsub(pattern="GEN_SG_21_", replacement="Gen_SG_21-", a2021$genetic_label)
 
 a2021 <- 
   left_join(x=a2021[-8], y=rename(d2021, wdfw_id=id), by=join_by(genetic_label==alt_id)) |> 
   relocate(wdfw_id, .before=match)
+
+
 
 # 2022
 a2022 <- 
@@ -776,12 +822,11 @@ a2023$genetic_label[382]
 a2023$wdfw_id[382] <- 
   "23NF0056"
 
-
-
 # 2024
 # no bio data
 filter(dat, grepl(pattern="^24", id)) |> 
-  select(1:2)
+  select(1:2) %>% 
+  print(n=nrow(.))
 
 # 2025
 a2025 <- 
@@ -806,12 +851,12 @@ a2025 <-
 anti_join(x=d2025, y=a2025, by=join_by(alt_id==nit_sample_name)) %>% 
   print(n=nrow(.))
 
-
 a2025_na <- 
   filter(a2025, is.na(wdfw_id))
 
-a2025_no <- 
-  filter(a2025, !is.na(wdfw_id))
+################################################################################
+# looks like the n=49 samples in a2025_na were not genotyped
+################################################################################
 
 a2025_na_SpnGnd <- 
   filter(a2025_na, grepl(pattern="SpnGnd", nit_sample_name))
@@ -820,27 +865,12 @@ a2025_na_CIR <-
   filter(a2025_na, grepl(pattern="CIR", nit_sample_name)) |> 
   arrange(dna_number)
 
-c("25UM0001", "25UM0002", "25UM0003", "25UM0005", "25UM0008", "25UM0012", "25UM0013", "25UM0014")
-
 a2025_na_Trad <- 
   filter(a2025_na, grepl(pattern="Trad", nit_sample_name))
 
-
-
-
-
-bind_rows(a2025_na_CIR, a2025_na_SpnGnd, a2025_na_Trad)
-
-a2025_na <- 
-  left_join(x=a2025_na[-8] |> mutate(dna_number=as.character(dna_number)), y=rename(d2025, wdfw_id=id), by=join_by(dna_number==alt_id)) |> 
-  relocate(wdfw_id, .before=match)
-
-a2025 <- 
-  bind_rows(a2025_na, a2025_no) |> 
-  arrange(wdfw_id)
-
-"CH.Gen.CIR2025-33"
-"CH.Gen.SpnGnd25-1"
+################################################################################
+# 
+################################################################################
 
 
 
@@ -852,24 +882,7 @@ a2025 <-
 
 
 
-filter(dat_bio, spreadsheet=="genetics sample numbers checking v2$weir.xlsx", sample_year==2013) |> view()
-names(dat_bio) |> sort()
 
-distinct(dat, alt_id)
-
-distinct(dat_bio, genetic_label)
-distinct(dat_bio, genetic_sample)
-distinct(dat_bio, nit_sample_name)
-
-distinct(dat_bio, genetic_label, genetic_sample, comment, nit_gen_sample_id_code, wdfw_genetic_sample_code_id, nit_sample_name) |> view()
-
-
-
-semi_join(
-  x=distinct(dat, id, alt_id), 
-  y=distinct(dat_bio, wdfw_id), 
-  by=join_by(id==wdfw_id)) |> 
-  distinct(alt_id)
 
 
 dat

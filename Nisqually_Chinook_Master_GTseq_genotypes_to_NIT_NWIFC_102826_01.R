@@ -77,7 +77,8 @@ table(dat$qc, useNA="ifany")
 
 table(dat$qc_status, useNA="ifany")
 
-
+odat <-
+  dat
 
 dat <-
   filter(
@@ -191,14 +192,12 @@ excel_sheets(
 
 read_excel(
   path="../data-from-Sayre/2025 Nisqually CH Genetics.xlsx",
-  # sheet="2021-23 Individual Gen",
   .name_repair=name_repair,
   col_types="text")
 
 dat_2025_Nisqually_CH_Genetics <- 
   read_excel(
     path="../data-from-Sayre/2025 Nisqually CH Genetics.xlsx",
-    # sheet="2021-23 Individual Gen", 
     .name_repair=name_repair,
     col_types="text")
 
@@ -513,7 +512,7 @@ sgs2012$wdfw_id <-
 
 # 2013
 #######################################################################################################
-# incomplete
+# weir incomplete
 #######################################################################################################
 weir2013 <- 
   filter(dat_bio, spreadsheet=="genetics sample numbers checking v2$weir.xlsx", sample_year==2013) |>
@@ -531,7 +530,7 @@ wd2013 %>%
   print(n=nrow(.))
 
 #######################################################################################################
-# incomplete
+# weir incomplete
 #######################################################################################################
 
 sgs2013 <- 
@@ -600,10 +599,16 @@ wd2014 %>%
 # incomplete
 #######################################################################################################
 
+# no 2014 SGS bio data or genotypes
+filter(dat_bio, spreadsheet=="genetics sample numbers checking v2$spawning ground.xlsx", sample_year==2014) |>
+  arrange(gs_number, comment)
+
+
 # 2015
+# all genotypes from juveniles
 # no bio data
 filter(dat, grepl(pattern="^15", id)) |> 
-  select(1:2) %>% 
+  select(1:2, 5) %>% 
   print(n=nrow(.))
 
 
@@ -859,35 +864,78 @@ a2025_na <-
 ################################################################################
 
 a2025_na_SpnGnd <- 
-  filter(a2025_na, grepl(pattern="SpnGnd", nit_sample_name))
+  filter(a2025_na, grepl(pattern="SpnGnd", nit_sample_name)) |> 
+  arrange(dna_number)
 
 a2025_na_CIR <- 
   filter(a2025_na, grepl(pattern="CIR", nit_sample_name)) |> 
   arrange(dna_number)
 
 a2025_na_Trad <- 
-  filter(a2025_na, grepl(pattern="Trad", nit_sample_name))
+  filter(a2025_na, grepl(pattern="Trad", nit_sample_name)) |> 
+  arrange(dna_number)
 
 ################################################################################
 # 
 ################################################################################
 
 
+table(dat$life_history, useNA="ifany")
+
+table(dat$green_db_collection_name, useNA="ifany") |> 
+  enframe() |> 
+  mutate(value=as.numeric(value)) %>% 
+  print(n=nrow(.))
 
 
+# 2013 & 2014 weir bio data couldn't be matched to genetic data.
+# I can match #'s of samples but can't get the row orders set, 
+# so phenotypic sex wouldn't match genotypic sex.
+
+# 2015 no bio data (all genetic data is from juveniles)
+
+# 2016 no genotypes or bio data
+
+# 2024 no bio data
+
+# 2019 only year with bio data for smolts
 
 
+bio <-
+  bind_rows(weir2012, sgs2012, weir2013, sgs2013, weir2014, a2017, a2018, a2019, a2021, a2022, a2023, a2025) |>
+  filter(!is.na(wdfw_id)) |>
+  arrange(wdfw_id) |> 
+  distinct(wdfw_id, .keep_all=TRUE)
+
+8444/8772
+
+bio[2787, 'length_cm'] <- 
+  NA
+
+bio <- 
+  mutate(bio, wdfw_code=str_extract(wdfw_id, "^\\w{4}"))
+
+gen <- 
+  filter(dat, grepl(pattern="^12|^13|^14|^15|^16|^17|^18|^19|^20|^21|^22|^23|^24|^25", id)) |> 
+  select(1:3, 5, 7:8) |>
+  arrange(id)
+
+gen$alt_id[gen$alt_id=="NA"] <- 
+  NA
+
+gen <- 
+  mutate(gen, code=str_extract(id, "^\\w{4}"))
 
 
+left_join(
+  x=group_by(gen, code, green_db_collection_name) |> count() |> ungroup(), 
+  y=group_by(bio, wdfw_code) |> count() |> ungroup(), 
+  by=join_by(code==wdfw_code), 
+  suffix=c("_genetic", "_biodata"))  %>% 
+  write_csv("../data/genetic-biodata-summary.csv", na="0")
 
+8444/19489
 
-
-
-
-
-dat
-
-# lookup1 <- 
 #   read_tsv(file="Green_DB_collection_name__origin.tsv")
 # 
 # dat <- 
